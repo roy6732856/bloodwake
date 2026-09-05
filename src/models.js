@@ -21,6 +21,7 @@ export function orb(group, x, y, z, radius, material) {
 }
 export function createHunter() {
   const g = new THREE.Group();
+  const pistolParts=[];
   const coat = mat(0x172330), boot = mat(0x10151c), silver = mat(0xc7ccca), red = mat(0x9f233e), skin = mat(0xc2aa98), gun = mat(0x8a9096);
   const legs = [box(g, -.18, .35, 0, .21, .64, .24, boot), box(g, .18, .35, 0, .21, .64, .24, boot)];
   cone(g, 0, .81, .04, .30, .48, .78, coat);
@@ -36,19 +37,23 @@ export function createHunter() {
     orb(g, side * .37, 1.43, -.03, .17, coat);
     const arm = box(g, side * .4, 1.33, -.24, .19, .22, .56, coat); arm.rotation.x = -.08;
     box(g, side * .4, 1.31, -.56, .15, .16, .15, skin);
-    box(g, side * .4, 1.39, -.76, .12, .12, .48, gun);
-    box(g, side * .4, 1.3, -.64, .10, .24, .12, boot);
+    pistolParts.push(box(g, side * .4, 1.39, -.76, .12, .12, .48, gun));
+    pistolParts.push(box(g, side * .4, 1.3, -.64, .10, .24, .12, boot));
   }
   const scarf = box(g, -.12, 1.38, .4, .22, .07, .85, red); scarf.rotation.x = -.35;
   const scarfTail = box(g, -.25, 1.22, .84, .16, .06, .60, red); scarfTail.rotation.y = -.2;
   const ring = new THREE.Mesh(new THREE.RingGeometry(.65, .69, 40), new THREE.MeshBasicMaterial({ color: 0x5be0d1, transparent: true, opacity: .55, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = .025; g.add(ring);
-  g.userData = { legs, scarf, scarfTail }; return g;
+  const shotgunParts=[box(g,.25,1.39,-.89,.24,.19,.88,gun),box(g,.25,1.36,-.48,.26,.2,.34,mat(0x684a36))];
+  const crossbowParts=[box(g,.25,1.4,-.86,.14,.14,.85,boot),box(g,.25,1.43,-1.02,.88,.09,.10,gun),box(g,.25,1.47,-.94,.05,.05,.96,mat(0xba914f))];
+  shotgunParts.forEach(m=>m.visible=false);crossbowParts.forEach(m=>m.visible=false);
+  g.userData = { legs, scarf, scarfTail, pistolParts, shotgunParts, crossbowParts, ring }; return g;
 }
+export function dressHunter(hunter,loadout){const data=hunter.userData;data.pistolParts.forEach(m=>m.visible=loadout.weapon==='pistols');data.shotgunParts.forEach(m=>m.visible=loadout.weapon==='shotgun');data.crossbowParts.forEach(m=>m.visible=loadout.weapon==='crossbow');const color={hunter:0x9f233e,shade:0x724db2,oracle:0x258f8b}[loadout.hunter];data.scarf.material=mat(color);data.scarfTail.material=mat(color);data.ring.material.color.setHex(color);}
 export function createEnemy(type) {
   const g = new THREE.Group();
   const boss = type === 'boss', brute = type === 'brute', bat = type === 'bat';
-  const cloak = mat(boss ? 0x672638 : brute ? 0x554951 : 0x46304e), skin = mat(0x88898a), dark = mat(0x161b24), eyes = mat(0xff6a65, 0xff352b, 2);
+  const cloak = mat(boss ? 0x672638 : brute ? 0x554951 : type==='caster'?0x235b64:type==='charger'?0x80392d:0x46304e), skin = mat(0x88898a), dark = mat(0x161b24), eyes = mat(0xff6a65, 0xff352b, 2);
   if (bat) {
     const body = orb(g, 0, .75, 0, .3, cloak); body.scale.set(.75, 1, 1.4);
     orb(g, 0, .91, -.25, .23, dark);
@@ -73,6 +78,8 @@ export function createEnemy(type) {
       if (brute || boss) cone(g, s * .4, 1.53, .03, 0, .14, .5, mat(0x9b8580), 5);
     }
     g.userData.legs = legs;
+    if(type==='caster'){box(g,.6,1.1,-.2,.08,1.8,.08,mat(0x697d83));orb(g,.6,2.08,-.2,.17,mat(0x62d3d8,0x33b7d2,2));cone(g,0,1.95,0,0,.32,.65,cloak,6);}
+    if(type==='charger'){for(const side of [-1,1]){cone(g,side*.23,1.94,-.05,0,.12,.5,mat(0xc4a58e),4);box(g,side*.43,1.35,-.1,.3,.23,.36,mat(0x9b6b51));}}
     if (boss) {
       for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; cone(g, Math.cos(a) * .21, 1.99, Math.sin(a) * .21, 0, .08, .5, mat(0xc7a875), 4); }
       const aura = new THREE.Mesh(new THREE.RingGeometry(.68, .76, 48), new THREE.MeshBasicMaterial({ color: 0xe84b65, side: THREE.DoubleSide })); aura.rotation.x = -Math.PI / 2; aura.position.y = .04; g.add(aura);
@@ -126,6 +133,8 @@ export function buildArena(scene) {
   for(const [x,z] of [[-8,5],[9,1],[-18,-12],[17,14]]) { const p=pillar(x,z,1.7+rand()); const f=orb(p,0,2.8,0,.17,mat(0xffb65f,0xff6a22,3)); flames.push(f); const light=new THREE.PointLight(0xff9652,7,7,2); light.position.set(x,2.8,z); group.add(light); }
   // Weathered ritual circle, visible through the real stone texture.
   for(const radius of [3.8,4.05,4.5]) { const ring = new THREE.Mesh(new THREE.RingGeometry(radius,radius+.025,96),new THREE.MeshBasicMaterial({color:0x927856,transparent:true,opacity:.27,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=.014;group.add(ring); }
+  const runeTexture=new THREE.TextureLoader().load('/assets/arcane-ring.png');
+  const ritual=new THREE.Mesh(new THREE.PlaneGeometry(8.6,8.6),new THREE.MeshBasicMaterial({map:runeTexture,color:0x91c8ba,transparent:true,opacity:.16,depthWrite:false,blending:THREE.AdditiveBlending}));ritual.rotation.x=-Math.PI/2;ritual.position.y=.022;group.add(ritual);
   for(let i=0;i<65;i++) { const a=rand()*Math.PI*2,r=24+rand()*7; const m=box(group,Math.cos(a)*r,.12,Math.sin(a)*r,.2+rand()*.5,.2+rand()*.5,.3+rand()*.5,stone);m.rotation.set(rand(),rand(),rand()); }
   return { obstacles, flames };
 }

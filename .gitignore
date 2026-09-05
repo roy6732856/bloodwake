@@ -8,3 +8,8 @@ dist/
 Thumbs.db
 .codex/
 tmp/
+
+.wrangler/
+.dev.vars
+.dev.vars.*
+wrangler.deploy.json

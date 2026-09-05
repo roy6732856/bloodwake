@@ -1,10 +1,12 @@
 export const RUN_SECONDS = 300;
-export const blankSave = () => ({ souls: 0, best: 0, runs: 0, wins: 0, ranks: { power: 0, vitality: 0, reach: 0 } });
+export const blankSave = () => ({ souls: 0, best: 0, runs: 0, wins: 0, achievements: [], ranks: { power: 0, vitality: 0, reach: 0 } });
 export function sanitizeSave(raw) {
   const save = blankSave();
   if (!raw || typeof raw !== 'object') return save;
   for (const k of ['souls', 'best', 'runs', 'wins']) save[k] = Math.max(0, Math.min(k === 'best' ? 300 : 1e7, Math.floor(Number(raw[k]) || 0)));
   for (const k of Object.keys(save.ranks)) save.ranks[k] = Math.max(0, Math.min(5, Math.floor(Number(raw.ranks?.[k]) || 0)));
+  save.achievements=Array.isArray(raw.achievements)?[...new Set(raw.achievements.filter(x=>['firstblood','warden','evolution','combo','dawn'].includes(x)))]:[];
+  save.wins = Math.min(save.wins, save.runs);
   return save;
 }
 export const legacy = [
@@ -20,11 +22,12 @@ export function purchase(save, id) {
   save.souls -= cost; save.ranks[id]++; return true;
 }
 export function statsFor(save) {
-  return { maxHp: 100 + save.ranks.vitality * 10, damage: 22 * (1 + save.ranks.power * .08), fireRate: .23, speed: 6.4, pickup: 3.4 + save.ranks.reach * .5, projectiles: 1, pierce: 0, regen: 0, crit: .08, dashCooldown: 2.4, novaDamage: 60, novaCooldown: 10 };
+  return { maxHp: 100 + save.ranks.vitality * 10, damage: 22 * (1 + save.ranks.power * .08), fireRate: .23, speed: 6.4, pickup: 3.4 + save.ranks.reach * .5, projectiles: 1, pierce: 0, regen: 0, crit: .08, dashCooldown: 2.4, novaDamage: 60, novaCooldown: 10, xpBonus:1, levelHeal:0, orbit:0, burn:0, frost:0 };
 }
 export function rewardFor(kills, time, win) { return Math.floor(kills / 8) + Math.floor(time / 20) + (win ? 20 : 0); }
 export function settleRun(save, result) {
-  const reward = rewardFor(result.kills, result.time, result.win);
+  const multiplier={standard:1,swarm:1.35,glass:1.5}[result.contract]||1;
+  const reward = Math.floor(rewardFor(result.kills, result.time, result.win)*multiplier);
   save.souls += reward; save.runs++; if (result.win) save.wins++;
   save.best = Math.max(save.best, Math.floor(Math.min(300, result.time))); return reward;
 }
@@ -38,6 +41,11 @@ export const upgrades = [
   { id: 'magnet', name: '靈魂呼喚', type: '拾取', symbol: '◎', description: '拾取範圍 +45%，吸引更遠的經驗', max: 4, apply: s => s.pickup *= 1.45 },
   { id: 'regen', name: '餘燼復甦', type: '恢復', symbol: '✚', description: '每秒恢復 1.5 點生命', max: 4, apply: s => s.regen += 1.5 },
   { id: 'nova', name: '破曉新星', type: '技能', symbol: '☼', description: '新星傷害 +50%，冷卻時間 -15%', max: 5, apply: s => { s.novaDamage *= 1.5; s.novaCooldown *= .85; } },
+  { id: 'crit', name: '致命獵殺', type: '暴擊', symbol: '✣', description: '暴擊率 +15%，爆發傷害提高', max: 4, apply: s => s.crit=Math.min(.9,s.crit+.15) },
+  { id: 'orbit', name: '環月飛刃', type: '護衛', symbol: '◈', description: '增加 1 枚環繞飛刃，持續切割近身敵人', max: 4, apply: s => s.orbit++ },
+  { id: 'burn', name: '煉獄餘燼', type: '燃燒', symbol: '♨', description: '銀彈附加灼燒，每秒造成 8 點傷害，持續 3 秒', max: 4, apply: s => s.burn+=8 },
+  { id: 'frost', name: '寒霜咒印', type: '控制', symbol: '❄', description: '命中使敵人減速 25%，持續 1.8 秒', max: 2, apply: s => s.frost+=.25 },
+  { id: 'wisdom', name: '禁書回響', type: '成長', symbol: 'Ⅳ', description: '獲得經驗 +20%，立即吸引全場靈魂', max: 3, magnet: true, apply: s => s.xpBonus+=.2 },
 ];
 export function choices(ranks, random = Math.random) {
   const pool = upgrades.filter(u => (ranks[u.id] || 0) < u.max);

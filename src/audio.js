@@ -8,7 +8,9 @@ export class Sound {
     o.type = kind; o.frequency.setValueAtTime(frequency, t); o.frequency.exponentialRampToValueAtTime(Math.max(20,end),t+duration);
     g.gain.setValueAtTime(volume,t);g.gain.exponentialRampToValueAtTime(.001,t+duration);o.connect(g);g.connect(this.ctx.destination);o.start(t);o.stop(t+duration);
   }
-  shoot(){this.tone(210,.075,.025,'triangle',45)}
+  shoot(weapon='pistols'){if(weapon==='shotgun'){this.tone(110,.18,.06,'sawtooth',24);this.tone(1700,.065,.018,'square',150);}else if(weapon==='crossbow'){this.tone(430,.13,.035,'triangle',85);this.tone(1600,.09,.016,'sine',350);}else this.tone(210,.075,.025,'triangle',45)}
+  crit(){this.tone(840,.055,.03,'triangle',430)}
+  evolve(){[220,330,440,660,880].forEach((f,i)=>setTimeout(()=>this.tone(f,.4,.045,'triangle'),i*80))}
   hit(){this.tone(95,.09,.025,'square',35)}
   pickup(){this.tone(720,.075,.013,'sine',1100)}
   dash(){this.tone(190,.2,.035,'sawtooth',40)}

@@ -7,6 +7,7 @@ const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const server = http.createServer(async (req, res) => {
   try {
     const url = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+    if(url==='/api/health'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({cloud:false,schema:1}));return;}
     const path = resolve(root, '.' + (url === '/' ? '/index.html' : url.startsWith('/assets/') ? '/public' + url : url));
     if (!path.startsWith(root + sep)) { res.writeHead(403).end(); return; }
     const data = await readFile(path);
