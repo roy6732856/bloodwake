@@ -4,6 +4,7 @@ import { blankSave, sanitizeSave, legacy, legacyCost, purchase, settleRun, forma
 import { normalizeLoadout, weapons, unlockAchievements } from './content.js';
 import { loadoutMarkup, codexMarkup } from './loadout-ui.js';
 import { connectCloud } from './cloud-ui.js';
+import { Lobby } from './lobby.js';
 
 const $=id=>document.getElementById(id), storageKey='bloodwake.save.v1';
 let save=blankSave(),storageAvailable=true,game,toastTimer,dialogKind='',lastHud=0;
@@ -14,7 +15,7 @@ function refreshMenu(){$('bank').textContent=save.souls;$('best').textContent=sa
 function toast(text){$('toast').textContent=text;$('toast').style.opacity='1';clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').style.opacity='0',3300);}
 function closeDialog(){$('dialog').classList.add('hidden');dialogKind='';}
 function showDialog(kind,html,focus=true){dialogKind=kind;$('dialog-content').innerHTML=html;$('dialog').classList.remove('hidden');if(focus)setTimeout(()=>$('dialog-content').querySelector('button:not(:disabled)')?.focus({preventScroll:true}),30);}
-function showLoadout(focus=true){showDialog('loadout',loadoutMarkup(selection,save),focus);for(const kind of ['hunter','weapon','contract','director','trial'])document.querySelectorAll(`[data-select-${kind}]`).forEach(b=>b.onclick=()=>{const scroll=$('dialog-content').scrollTop;selection[kind]=b.getAttribute(`data-select-${kind}`);showLoadout(false);$('dialog-content').scrollTop=scroll;document.querySelector(`[data-select-${kind}="${selection[kind]}"]`)?.focus({preventScroll:true});});$('deploy').onclick=()=>game.start(selection);$('loadout-back').onclick=closeDialog;}
+function showLoadout(focus=true){showDialog('loadout',loadoutMarkup(selection,save),focus);for(const kind of ['hunter','weapon','contract','director','trial'])document.querySelectorAll(`[data-select-${kind}]`).forEach(b=>b.onclick=()=>{const scroll=$('dialog-content').scrollTop;selection[kind]=b.getAttribute(`data-select-${kind}`);if(kind==='hunter')game.lobby.select(selection.hunter,false);else if(kind==='weapon')game.lobby.applyDye();showLoadout(false);$('dialog-content').scrollTop=scroll;document.querySelector(`[data-select-${kind}="${selection[kind]}"]`)?.focus({preventScroll:true});});$('deploy').onclick=()=>game.start(selection);$('loadout-back').onclick=closeDialog;}
 function showCodex(){showDialog('codex',codexMarkup(save));$('codex-back').onclick=closeDialog;}
 function showHelp(){showDialog('help',`<div class="sub">獵人手冊</div><h2>活到黎明</h2><p>在血月獵場存活 5 分鐘。擊倒敵人、拾取青色靈魂，<br>升級時從三項隨機強化中選擇一項。</p><dl class="key-list"><dt>W A S D</dt><dd>移動，也支援方向鍵</dd><dt>滑鼠 + 左鍵</dt><dd>瞄準地面位置；按住左鍵持續射擊</dd><dt>SPACE</dt><dd>朝移動方向衝刺，短暫無敵</dd><dt>E</dt><dd>釋放新星，傷害並擊退周圍敵人</dd><dt>Q</dt><dd>開啟附近聖匣，獲得額外強化</dd><dt>F</dt><dd>切換自動射擊，仍由滑鼠瞄準</dd><dt>ESC / P</dt><dd>暫停與繼續；切換視窗自動暫停</dd><dt>1 / 2 / 3</dt><dd>快速選擇升級項目</dd><dt>觸控裝置</dt><dd>左搖桿移動，右搖桿瞄準並射擊；點技能施放</dd></dl><p class="muted">紅色結晶恢復生命。墓碑會擋住銀彈，衝刺可閃避典獄長的環形衝擊波。<br>結算獲得的殘魂，可在「獵人傳承」換取永久能力。<br>血月意志會調整敵潮節奏；金色裂隙預告包抄。結算回饋會影響下局推薦。</p><button id="help-back" class="primary">返回</button>`);$('help-back').onclick=closeDialog;}
 function showLegacy(){refreshMenu();showDialog('legacy',`<div class="sub">跨局永久成長</div><h2>獵人傳承</h2><p>可用殘魂 <strong>${save.souls}</strong>　·　每項最高 5 階</p>${legacy.map(u=>{const r=save.ranks[u.id],cost=legacyCost(r);return `<div class="legacy-row"><span class="symbol">${u.symbol}</span><div><h3>${u.name} <small>${r} / 5</small></h3><p>${u.description}</p></div><button data-buy="${u.id}" ${r>=5||save.souls<cost?'disabled':''}>${r>=5?'已達上限':`${cost} 殘魂 · 強化`}</button></div>`;}).join('')}<p class="muted" style="margin-top:22px">能力在下一局開始時套用。${storageAvailable?'進度自動儲存在此瀏覽器，可在主選單開啟雲端同步。':'瀏覽器儲存不可用，進度只保留於本次開啟期間。'}</p><div class="dialog-actions"><button id="legacy-back" class="primary">返回獵場</button></div>`);$('legacy-back').onclick=()=>{closeDialog();refreshMenu();};document.querySelectorAll('[data-buy]').forEach(b=>b.onclick=()=>{if(purchase(save,b.dataset.buy)){persist();showLegacy();}});}
@@ -33,7 +34,7 @@ function onState(state){
   $('world').classList.toggle('playing',state==='playing');
   if(state==='playing'){closeDialog();$('menu').classList.add('hidden');$('hud').classList.remove('hidden');$('reticle').classList.remove('hidden');document.activeElement?.blur();}
   if(state==='paused'){$('reticle').classList.add('hidden');showPause();}
-  if(state==='menu'){closeDialog();$('menu').classList.remove('hidden');$('hud').classList.add('hidden');refreshMenu();$('start').focus();cloud?.sync();}
+  if(state==='menu'){$('damage-flash').style.opacity='0';closeDialog();$('menu').classList.remove('hidden');$('hud').classList.add('hidden');refreshMenu();game.lobby?.select(selection.hunter,false);requestAnimationFrame(()=>game.lobby?.measure());$('quick-start').focus({preventScroll:true});cloud?.sync();}
 }
 function updateHud(s){
   $('damage-flash').style.opacity=Math.max(0,s.hurt)*.7;
@@ -68,6 +69,8 @@ document.addEventListener('keydown',e=>{
 $('reload-game').onclick=()=>location.reload();
 try{
   game=new Game($('world'),save,emit);
+  game.lobby=new Lobby(game,selection,()=>{});
+  $('quick-start').onclick=()=>game.start(selection);
   $('start').onclick=showLoadout;$('pause').onclick=()=>game.pause();$('dash').onclick=()=>game.dash();$('nova').onclick=()=>game.nova();$('interact').onclick=()=>game.encounters.openChest();
   $('sound').onclick=()=>{game.sound.enabled=!game.sound.enabled;if(game.sound.enabled)game.sound.unlock();$('sound').innerHTML=`♪ <span>音效 ${game.sound.enabled?'開':'關'}</span>`;};
   $('open-help').onclick=showHelp;$('open-legacy').onclick=showLegacy;$('open-codex').onclick=showCodex;attachPad('move-pad',game.touchMove);attachPad('aim-pad',game.touchAim);refreshMenu();

@@ -28,7 +28,7 @@ async function readBody(request) {
 }
 async function api(request, env) {
   const url = new URL(request.url), path = url.pathname;
-  if (path === '/api/health' && request.method === 'GET') return json({ cloud: Boolean(env.DB), schema: 1, version: '0.4.0' });
+  if (path === '/api/health' && request.method === 'GET') return json({ cloud: Boolean(env.DB), schema: 1, version: '0.5.0' });
   if (path !== '/api/save') return json({ error: 'not_found' }, 404);
   if (!['GET', 'PUT'].includes(request.method)) return json({ error: 'method_not_allowed' }, 405);
   if (request.method === 'PUT' && request.headers.get('origin') !== url.origin) return json({ error: 'origin' }, 403);

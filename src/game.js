@@ -1,3 +1,4 @@
+import { animateHunter } from './hunter-model.js';
 import { BloodmoonDirector } from './director.js';
 import * as THREE from '../vendor/three.module.js';
 import { buildArena, createHunter, createEnemy, dressHunter, mat } from './models.js';
@@ -45,7 +46,7 @@ export class Game {
     this.stats=statsFor(this.save);configureLoadout(this.stats,this.loadout);this.weapon=weapons.find(w=>w.id===this.loadout.weapon);this.contract=contracts.find(c=>c.id===this.loadout.contract);this.hp=this.stats.maxHp;this.time=0;this.kills=0;this.level=1;this.xp=0;this.ranks={};this.pendingChoices=[];this.spawnClock=1.8;this.shotClock=0;this.dashLeft=0;this.dashTimer=0;this.novaLeft=0;this.invuln=0;this.hurtFlash=0;this.nextBoss=60;this.boss=null;this.cameraTarget=new THREE.Vector3();this.hunter.position.set(0,0,0);this.hunter.rotation.y=0;this.hunter.visible=true;this.keys.clear();this.mouseDown=false;this.auto=false;this.dashDirection=new THREE.Vector3(0,0,-1);this.touchMove.set(0,0);this.touchAim.set(0,0);this.fired=0;this.collected=0;this.upgradesChosen=0;this.dashesUsed=0;this.novasUsed=0;this.bossKills=0;this.combo=0;this.comboLeft=0;this.bestCombo=0;this.evolved=false;this.rerolls=1;this.upgradeSource='level';
   }
   demo(){for(let i=0;i<9;i++){const a=i*2.399;this.spawnEnemy(i%4===0?'brute':'ghoul',Math.cos(a)*(8+i*.8),Math.sin(a)*(8+i*.8));}for(let i=0;i<12;i++){const a=i*1.97;this.dropGem(Math.cos(a)*(3+i*.6),Math.sin(a)*(3+i*.6),2);}}
-  start(loadout=this.loadout){this.loadout=normalizeLoadout(loadout);this.reset();this.director.start();dressHunter(this.hunter,this.loadout);this.state='playing';this.sound.unlock();for(let i=0;i<5;i++){const a=i*Math.PI*2/5;this.spawnEnemy('ghoul',Math.cos(a)*11,Math.sin(a)*11);}this.emit('state','playing');this.emit('toast',`${this.weapon.name} · ${this.contract.name}`);}
+  start(loadout=this.loadout){this.loadout=normalizeLoadout(loadout);this.reset();this.director.start();dressHunter(this.hunter,this.loadout,this.lobby?.getDye(this.loadout.hunter));this.state='playing';this.sound.unlock();for(let i=0;i<5;i++){const a=i*Math.PI*2/5;this.spawnEnemy('ghoul',Math.cos(a)*11,Math.sin(a)*11);}this.emit('state','playing');this.emit('toast',`${this.weapon.name} · ${this.contract.name}`);}
   pause(){if(this.state!=='playing')return;this.state='paused';this.releaseInput();this.emit('state','paused');}
   resume(){if(this.state!=='paused')return;this.state='playing';this.releaseInput();this.emit('state','playing');}
   toMenu(){this.reset();this.state='menu';this.demo();this.emit('state','menu');}
@@ -54,7 +55,7 @@ export class Game {
   attachInput(){
     window.addEventListener('resize',()=>this.resize());
     window.addEventListener('keydown',e=>{
-      if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
+      if(this.state==='playing'&&['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();
       this.keys.add(e.code);if(e.repeat)return;
       if(e.code==='Escape'||e.code==='KeyP'){if(this.state==='playing')this.pause();else if(this.state==='paused')this.resume();}
       if(this.state==='playing'){
@@ -233,6 +234,7 @@ export class Game {
   }
   frame(now){
     const dt=Math.min((now-this.last)/1000,.05);this.last=now;
+    if(this.state==='menu'&&this.lobby){this.lobby.render(document.hidden?0:dt);requestAnimationFrame(this.frame);return;}
     if(this.state==='playing'&&this.feedback.stop<=0){
       // Fixed simulation steps keep collision and spawn rates stable across frame rates.
       this.accumulator+=dt;while(this.accumulator>=1/60){this.update(1/60);this.accumulator-=1/60;if(this.state!=='playing'){this.accumulator=0;break;}}
@@ -243,7 +245,7 @@ export class Game {
     this.camera.position.set(this.cameraTarget.x+(Math.random()-.5)*shake,26,this.cameraTarget.z+19+(Math.random()-.5)*shake);this.camera.lookAt(this.cameraTarget);this.camera.updateMatrixWorld();this.feedback.update(this.state==='playing'?dt:0);
     this.playerLight.position.set(p.x,3,p.z);
     this.flames.forEach((f,i)=>f.scale.setScalar(1+Math.sin(now*.009+i)*.17));
-    this.renderer.render(this.scene,this.camera);this.emit('frame',this.snapshot());requestAnimationFrame(this.frame);
+    animateHunter(this.hunter,now*.001,this.feedback.reduced?0:1);this.renderer.render(this.scene,this.camera);this.emit('frame',this.snapshot());requestAnimationFrame(this.frame);
   }
   snapshot(){return {state:this.state,time:this.time,hp:this.hp,maxHp:this.stats.maxHp,kills:this.kills,level:this.level,xp:this.xp,xpNeeded:xpNeeded(this.level),dash:this.dashLeft,dashMax:this.stats.dashCooldown,nova:this.novaLeft,novaMax:this.stats.novaCooldown,boss:this.boss?this.boss.hp/this.boss.maxHp:0,auto:this.auto,hurt:this.hurtFlash,enemies:this.enemies.length,bullets:this.bullets.length,gems:this.gems.length,position:{x:this.hunter.position.x,z:this.hunter.position.z},fired:this.fired,collected:this.collected,upgradesChosen:this.upgradesChosen,dashesUsed:this.dashesUsed,novasUsed:this.novasUsed,combo:this.combo,comboLeft:this.comboLeft,bestCombo:this.bestCombo,evolved:this.evolved,weapon:this.evolved?this.weapon.evolution.name:this.weapon.name,loadout:this.loadout,director:this.director.snapshot(),encounter:this.encounters.snapshot()};}
 }

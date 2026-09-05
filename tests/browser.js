@@ -3,12 +3,27 @@ const frame=document.getElementById('game'),out=document.getElementById('output'
 frame.onload=()=>out.textContent='Ready';
 button.onclick=async()=>{
   const g=frame.contentWindow.__bloodwake,doc=frame.contentDocument,lines=[];if(!g){out.textContent='FAIL: game did not boot';return;}
-  const original=JSON.stringify(g.save),persisted=localStorage.getItem('bloodwake.save.v1');g.sound.enabled=false;button.disabled=true;
+  const original=JSON.stringify(g.save),persisted=localStorage.getItem('bloodwake.save.v1'),appearance=localStorage.getItem('bloodwake.appearance.v1'),originalDyes={...g.lobby.dyes};g.sound.enabled=false;button.disabled=true;
   await new Promise(resolve=>setTimeout(resolve,100));
   function assert(ok,message){if(!ok)throw Error(message);}
   function test(name,fn){try{Object.assign(g.save,blankSave());g.start({hunter:'hunter',weapon:'pistols',contract:'standard'});fn();lines.push('PASS '+name);}catch(e){lines.push('FAIL '+name+': '+e.message);}out.textContent=lines.join('\n');}
   function step(seconds){for(let i=0;i<Math.ceil(seconds*60);i++)g.update(1/60);}
   function clearEnemies(){for(const e of g.enemies)g.entities.remove(e.mesh);g.enemies=[];g.boss=null;g.spawnClock=999;}
+  test('Lobby selects a distinct 3D role and carries its dye into quick-start combat',()=>{
+    g.toMenu();doc.querySelector('[data-lobby-hunter="oracle"]').click();doc.querySelector('[data-dye="2"]').click();
+    assert(doc.querySelector('#hero-name').textContent==='月蝕使徒','role name did not change');
+    assert(g.lobby.model.userData.variants.oracle.visible&&!g.lobby.model.userData.variants.hunter.visible,'wrong 3D silhouette');
+    const dye=g.lobby.color;doc.querySelector('#quick-start').click();
+    assert(g.loadout.hunter==='oracle'&&g.hunter.userData.dye===dye,'lobby appearance not applied in combat');
+    assert(g.stats.novaCooldown===6.5,'selected role ability not applied');
+  });
+  test('Lobby rotation, skill preview and loadout changes affect actual scene objects',()=>{
+    g.toMenu();doc.querySelector('[data-lobby-hunter="shade"]').click();const angle=g.lobby.angle;doc.querySelector('#rotate-right').click();assert(g.lobby.angle>angle,'rotation did not change');
+    doc.querySelector('#preview-effect').click();g.lobby.render(.2);assert(g.lobby.fxParticles.some(p=>p.visible)&&g.lobby.model.position.x!==0,'dash preview did not animate');
+    doc.querySelector('#preview-nova').click();g.lobby.render(.2);assert(g.lobby.wave.visible,'nova wave absent');
+    doc.querySelector('#start').click();doc.querySelector('[data-select-hunter="hunter"]').click();doc.querySelector('[data-select-weapon="crossbow"]').click();doc.querySelector('#loadout-back').click();
+    assert(g.lobby.role==='hunter'&&g.lobby.model.userData.crossbowParts.every(p=>p.visible),'advanced loadout and lobby diverged');
+  });
   test('WASD movement and arena bounds',()=>{clearEnemies();g.keys.add('KeyD');step(1);g.keys.clear();assert(g.hunter.position.x>6&&g.hunter.position.x<7,'D should move ~6.4m');g.hunter.position.set(27.4,0,12);g.keys.add('KeyD');step(1);assert(g.hunter.position.x<=27.5,'escaped arena');});
   test('Gravestone collision stops traversal',()=>{clearEnemies();const o=g.obstacles.find(o=>o.x===-10);g.hunter.position.set(o.x-3,0,o.z);g.keys.add('KeyD');step(.6);assert(g.hunter.position.x<=o.x-o.r-.44,'walked through gravestone');});
   test('Aimed silver bullets kill a real enemy',()=>{clearEnemies();g.camera.position.set(0,26,19);g.camera.lookAt(0,0,0);g.camera.updateMatrixWorld();g.pointer.set(0,.4);const e=g.spawnEnemy('ghoul',0,-5);e.speed=0;g.mouseDown=true;step(1);assert(g.fired>=4,'shoot input failed');assert(g.kills===1,'projectiles did not kill');assert(g.gems.length>0,'kill did not drop XP');});
@@ -53,5 +68,14 @@ button.onclick=async()=>{
       assert(g.state==='victory',weapon+' never reached five-minute result');assert(g.encounters.eventsSeen>=5,weapon+' did not run world events');assert(g.kills>0&&g.upgradesChosen>0,weapon+' did not exercise combat progression');lines.push(`INFO ${weapon}: ${g.kills} kills, LV ${g.level}, ${g.encounters.eventsSeen} events`);
     }
   });
-  Object.assign(g.save,JSON.parse(original));if(persisted===null)localStorage.removeItem('bloodwake.save.v1');else localStorage.setItem('bloodwake.save.v1',persisted);g.toMenu();button.disabled=false;out.textContent=lines.join('\n')+`\n${lines.filter(x=>x.startsWith('PASS')).length} passed, ${lines.filter(x=>x.startsWith('FAIL')).length} failed`;
+  try {
+    g.toMenu();const music=g.lobby.music;
+    if(!music.playing)await music.toggle();await new Promise(r=>setTimeout(r,300));
+    assert(music.playing&&g.sound.ctx.state==='running'&&music.nodes.size>0,'music produced no active audio');
+    for(let i=0;i<12;i++)g.lobby.select(['hunter','shade','oracle'][i%3],false);
+    await new Promise(r=>setTimeout(r,400));assert(music.role==='oracle'&&music.nodes.size<30,'theme switch leaked voices');
+    await music.toggle();await new Promise(r=>setTimeout(r,300));assert(!music.playing&&music.nodes.size===0&&!music.timer,'pause left audio running');
+    lines.push('PASS Music produces audio, switches themes without voice leaks and fully stops');
+  }catch(error){lines.push('FAIL Music lifecycle: '+error.message);if(g.lobby.music.playing)await g.lobby.music.toggle();}
+  Object.assign(g.save,JSON.parse(original));if(persisted===null)localStorage.removeItem('bloodwake.save.v1');else localStorage.setItem('bloodwake.save.v1',persisted);if(appearance===null)localStorage.removeItem('bloodwake.appearance.v1');else localStorage.setItem('bloodwake.appearance.v1',appearance);g.lobby.dyes=originalDyes;g.toMenu();button.disabled=false;out.textContent=lines.join('\n')+`\n${lines.filter(x=>x.startsWith('PASS')).length} passed, ${lines.filter(x=>x.startsWith('FAIL')).length} failed`;
 };

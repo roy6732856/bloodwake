@@ -19,37 +19,7 @@ export function orb(group, x, y, z, radius, material) {
   const m = new THREE.Mesh(geo(`orb${radius}`, () => new THREE.IcosahedronGeometry(radius, 1)), material);
   m.position.set(x, y, z); m.castShadow = true; group.add(m); return m;
 }
-export function createHunter() {
-  const g = new THREE.Group();
-  const pistolParts=[];
-  const coat = mat(0x172330), boot = mat(0x10151c), silver = mat(0xc7ccca), red = mat(0x9f233e), skin = mat(0xc2aa98), gun = mat(0x8a9096);
-  const legs = [box(g, -.18, .35, 0, .21, .64, .24, boot), box(g, .18, .35, 0, .21, .64, .24, boot)];
-  cone(g, 0, .81, .04, .30, .48, .78, coat);
-  box(g, 0, 1.28, 0, .61, .64, .34, coat);
-  box(g, 0, 1.13, -.19, .05, .65, .02, mat(0x9b8260));
-  box(g, 0, 1.02, 0, .63, .08, .37, boot);
-  box(g, 0, 1.02, -.21, .12, .09, .05, silver);
-  cone(g, 0, 1.57, 0, .20, .31, .16, red);
-  orb(g, 0, 1.78, 0, .235, skin);
-  const hair = orb(g, 0, 1.9, .01, .24, silver); hair.scale.set(1, .65, 1);
-  box(g, 0, 1.73, -.206, .35, .065, .05, boot);
-  for (const side of [-1, 1]) {
-    orb(g, side * .37, 1.43, -.03, .17, coat);
-    const arm = box(g, side * .4, 1.33, -.24, .19, .22, .56, coat); arm.rotation.x = -.08;
-    box(g, side * .4, 1.31, -.56, .15, .16, .15, skin);
-    pistolParts.push(box(g, side * .4, 1.39, -.76, .12, .12, .48, gun));
-    pistolParts.push(box(g, side * .4, 1.3, -.64, .10, .24, .12, boot));
-  }
-  const scarf = box(g, -.12, 1.38, .4, .22, .07, .85, red); scarf.rotation.x = -.35;
-  const scarfTail = box(g, -.25, 1.22, .84, .16, .06, .60, red); scarfTail.rotation.y = -.2;
-  const ring = new THREE.Mesh(new THREE.RingGeometry(.65, .69, 40), new THREE.MeshBasicMaterial({ color: 0x5be0d1, transparent: true, opacity: .55, side: THREE.DoubleSide }));
-  ring.rotation.x = -Math.PI / 2; ring.position.y = .025; g.add(ring);
-  const shotgunParts=[box(g,.25,1.39,-.89,.24,.19,.88,gun),box(g,.25,1.36,-.48,.26,.2,.34,mat(0x684a36))];
-  const crossbowParts=[box(g,.25,1.4,-.86,.14,.14,.85,boot),box(g,.25,1.43,-1.02,.88,.09,.10,gun),box(g,.25,1.47,-.94,.05,.05,.96,mat(0xba914f))];
-  shotgunParts.forEach(m=>m.visible=false);crossbowParts.forEach(m=>m.visible=false);
-  g.userData = { legs, scarf, scarfTail, pistolParts, shotgunParts, crossbowParts, ring }; return g;
-}
-export function dressHunter(hunter,loadout){const data=hunter.userData;data.pistolParts.forEach(m=>m.visible=loadout.weapon==='pistols');data.shotgunParts.forEach(m=>m.visible=loadout.weapon==='shotgun');data.crossbowParts.forEach(m=>m.visible=loadout.weapon==='crossbow');const color={hunter:0x9f233e,shade:0x724db2,oracle:0x258f8b}[loadout.hunter];data.scarf.material=mat(color);data.scarfTail.material=mat(color);data.ring.material.color.setHex(color);}
+export { createHunter, dressHunter } from './hunter-model.js';
 export function createEnemy(type) {
   const g = new THREE.Group();
   const boss = type === 'boss', brute = type === 'brute', bat = type === 'bat';
