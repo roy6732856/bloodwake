@@ -16,7 +16,7 @@ export class CombatFeedback {
   }
   update(dt){
     this.shake=Math.max(0,this.shake-dt*.7);this.stop=Math.max(0,this.stop-dt);
-    for(let i=this.sprites.length-1;i>=0;i--){const s=this.sprites[i];s.life-=dt;s.mesh.material.opacity=Math.max(0,s.life/s.max);if(s.ownGeo)s.mesh.rotation.z+=dt*.5;else s.mesh.scale.setScalar(s.size*(1+(1-s.life/s.max)*.45));if(s.life<=0){this.game.entities.remove(s.mesh);s.mesh.material.dispose();if(s.ownGeo)s.mesh.geometry.dispose();this.sprites.splice(i,1);}}
+    for(let i=this.sprites.length-1;i>=0;i--){const s=this.sprites[i];s.life-=dt;s.mesh.material.opacity=Math.max(0,s.life/s.max);if(s.ownGeo){if(!s.fixedRotation)s.mesh.rotation.z+=dt*.5;}else s.mesh.scale.setScalar(s.size*(1+(1-s.life/s.max)*.45));if(s.life<=0){this.game.entities.remove(s.mesh);s.mesh.material.dispose();if(s.ownGeo)s.mesh.geometry.dispose();this.sprites.splice(i,1);}}
     const w=this.game.container.clientWidth,h=this.game.container.clientHeight;
     for(let i=this.numbers.length-1;i>=0;i--){const n=this.numbers[i];n.life-=dt;n.point.y+=dt*1.2;const v=n.point.clone().project(this.game.camera);n.el.style.transform=`translate(${(v.x*.5+.5)*w+n.offset}px,${(-v.y*.5+.5)*h}px)`;n.el.style.opacity=Math.min(1,n.life*3);if(n.life<=0){n.el.remove();this.numbers.splice(i,1);}}
   }

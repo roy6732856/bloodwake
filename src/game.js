@@ -1,3 +1,5 @@
+import {buildChoices,readyEvolutions,recipeFor} from './builds.js';
+import {Arsenal} from './arsenal.js';
 import {makeArena} from './arenas.js';
 import {maps} from './world-content.js';
 import {Expedition} from './expedition.js';
@@ -38,7 +40,7 @@ export class Game {
     this.bulletGeo=new THREE.CylinderGeometry(.035,.035,.9,5);this.bulletGeo.rotateX(Math.PI/2);this.bulletMat=new THREE.MeshBasicMaterial({color:0xffe8b5});
     this.particleGeo=new THREE.IcosahedronGeometry(.075,0);this.particleMats=[new THREE.MeshBasicMaterial({color:0xe9b87b}),new THREE.MeshBasicMaterial({color:0x9e4660}),new THREE.MeshBasicMaterial({color:0x67e5d7})];
     this.ringGeo=new THREE.RingGeometry(.94,1,64);this.ringGeo.rotateX(-Math.PI/2);
-    this.loadout=normalizeLoadout();this.encounters=new Encounters(this);this.feedback=new CombatFeedback(this);this.director=new BloodmoonDirector(this);this.expedition=new Expedition(this);
+    this.loadout=normalizeLoadout();this.encounters=new Encounters(this);this.feedback=new CombatFeedback(this);this.director=new BloodmoonDirector(this);this.expedition=new Expedition(this);this.arsenal=new Arsenal(this);
     this.reset();this.state='menu';this.demo();this.resize();
     this.attachInput();this.last=performance.now();this.accumulator=0;this.frame=this.frame.bind(this);requestAnimationFrame(this.frame);
   }
@@ -49,10 +51,10 @@ export class Game {
     const color=maps.find(m=>m.id===id)?.color||0x0b131d;this.scene.background.setHex(color);this.scene.fog.color.setHex(color);
   }
   reset() {
-    this.expedition.reset();this.encounters.reset();this.feedback.reset();this.director.reset();this.runId=crypto.randomUUID();
+    this.arsenal.reset();this.expedition.reset();this.encounters.reset();this.feedback.reset();this.director.reset();this.runId=crypto.randomUUID();
     for(const r of this.rings)r.mesh.material.dispose();
     this.entities.clear();this.enemies=[];this.bullets=[];this.gems=[];this.particles=[];this.rings=[];
-    this.stats=statsFor(this.save);configureLoadout(this.stats,this.loadout);this.weapon=weapons.find(w=>w.id===this.loadout.weapon);this.contract=contracts.find(c=>c.id===this.loadout.contract);this.hp=this.stats.maxHp;this.time=0;this.kills=0;this.level=1;this.xp=0;this.ranks={};this.pendingChoices=[];this.spawnClock=1.8;this.shotClock=0;this.dashLeft=0;this.dashTimer=0;this.novaLeft=0;this.invuln=0;this.hurtFlash=0;this.nextBoss=60;this.boss=null;this.cameraTarget=new THREE.Vector3();this.hunter.position.set(0,0,0);this.hunter.rotation.y=0;this.hunter.visible=true;this.keys.clear();this.mouseDown=false;this.auto=false;this.dashDirection=new THREE.Vector3(0,0,-1);this.touchMove.set(0,0);this.touchAim.set(0,0);this.fired=0;this.collected=0;this.upgradesChosen=0;this.dashesUsed=0;this.novasUsed=0;this.bossKills=0;this.combo=0;this.comboLeft=0;this.bestCombo=0;this.evolved=false;this.rerolls=1;this.upgradeSource='level';
+    this.stats=statsFor(this.save);configureLoadout(this.stats,this.loadout);this.weapon=weapons.find(w=>w.id===this.loadout.weapon);this.contract=contracts.find(c=>c.id===this.loadout.contract);this.hp=this.stats.maxHp;this.time=0;this.kills=0;this.level=1;this.xp=0;this.ranks={armament:1};this.skillEvolutions={};this.selectedUpgrade=-1;this.pendingChoices=[];this.spawnClock=1.8;this.shotClock=0;this.dashLeft=0;this.dashTimer=0;this.novaLeft=0;this.invuln=0;this.hurtFlash=0;this.nextBoss=60;this.boss=null;this.cameraTarget=new THREE.Vector3();this.hunter.position.set(0,0,0);this.hunter.rotation.y=0;this.hunter.visible=true;this.keys.clear();this.mouseDown=false;this.auto=false;this.dashDirection=new THREE.Vector3(0,0,-1);this.touchMove.set(0,0);this.touchAim.set(0,0);this.fired=0;this.collected=0;this.upgradesChosen=0;this.dashesUsed=0;this.novasUsed=0;this.bossKills=0;this.combo=0;this.comboLeft=0;this.bestCombo=0;this.evolved=false;this.rerolls=1;this.upgradeSource='level';
   }
   demo(){for(let i=0;i<9;i++){const a=i*2.399;this.spawnEnemy(i%4===0?'brute':'ghoul',Math.cos(a)*(8+i*.8),Math.sin(a)*(8+i*.8));}for(let i=0;i<12;i++){const a=i*1.97;this.dropGem(Math.cos(a)*(3+i*.6),Math.sin(a)*(3+i*.6),2);}}
   start(loadout=this.loadout){this.loadout=normalizeLoadout(loadout);this.selectArena(this.loadout.map);this.reset();this.director.start();this.expedition.start();dressHunter(this.hunter,this.loadout,this.lobby?.getDye(this.loadout.hunter));this.state='playing';this.sound.unlock();for(let i=0;i<5;i++){const a=i*Math.PI*2/5;this.spawnEnemy('ghoul',Math.cos(a)*11,Math.sin(a)*11);}this.emit('state','playing');this.emit('toast',`${this.weapon.name} · ${this.contract.name}`);}
@@ -60,7 +62,7 @@ export class Game {
   resume(){if(this.state!=='paused')return;this.state='playing';this.releaseInput();this.emit('state','playing');}
   toMenu(){this.reset();this.state='menu';this.demo();this.emit('state','menu');}
   releaseInput(){this.keys.clear();this.mouseDown=false;this.touchMove.set(0,0);this.touchAim.set(0,0);}
-  finish(win,abandoned=false){if(this.state!=='playing')return;this.state=win?'victory':'defeat';this.hunter.visible=true;this.releaseInput();this.emit('end',{win,kills:this.kills,time:this.time,level:this.level,contract:this.loadout.contract,weapon:this.weapon.name,bestCombo:this.bestCombo,bossKills:this.bossKills,evolved:this.evolved,chests:this.encounters.chestsOpened,runId:this.runId,weaponId:this.loadout.weapon,mode:this.loadout.director,trial:this.loadout.trial,map:this.loadout.map,mission:this.loadout.mission,hunter:this.loadout.hunter,objective:this.expedition.progress,damageTaken:this.director.damageTaken,distance:this.director.distance,dashes:this.dashesUsed,director:this.director.snapshot(),abandoned});}
+  finish(win,abandoned=false){if(this.state!=='playing')return;this.state=win?'victory':'defeat';this.hunter.visible=true;this.releaseInput();this.emit('end',{win,kills:this.kills,time:this.time,level:this.level,contract:this.loadout.contract,weapon:this.weapon.name,bestCombo:this.bestCombo,bossKills:this.bossKills,evolved:this.evolved||Object.keys(this.skillEvolutions).length>0,chests:this.encounters.chestsOpened,runId:this.runId,weaponId:this.loadout.weapon,mode:this.loadout.director,trial:this.loadout.trial,map:this.loadout.map,mission:this.loadout.mission,hunter:this.loadout.hunter,objective:this.expedition.progress,damageTaken:this.director.damageTaken,distance:this.director.distance,dashes:this.dashesUsed,director:this.director.snapshot(),abandoned});}
   attachInput(){
     window.addEventListener('resize',()=>this.resize());
     window.addEventListener('keydown',e=>{
@@ -69,7 +71,7 @@ export class Game {
       if(e.code==='Escape'||e.code==='KeyP'){if(this.state==='playing')this.pause();else if(this.state==='paused')this.resume();}
       if(this.state==='playing'){
         if(e.code==='Space')this.dash();if(e.code==='KeyE')this.nova();if(e.code==='KeyQ')this.encounters.openChest();if(e.code==='KeyF'){this.auto=!this.auto;this.emit('toast',this.auto?'自動射擊開啟 · 滑鼠控制瞄準':'自動射擊關閉');}
-      }else if(this.state==='upgrade'&&/^Digit[123]$/.test(e.code))this.chooseUpgrade(Number(e.code.at(-1))-1);
+      }else if(this.state==='upgrade'){if(/^Digit[123]$/.test(e.code)){e.preventDefault();this.selectUpgrade(Number(e.code.at(-1))-1);}if(e.code==='Enter'){e.preventDefault();this.confirmUpgrade();}}
     });
     window.addEventListener('keyup',e=>this.keys.delete(e.code));
     window.addEventListener('pointermove',e=>{
@@ -157,19 +159,21 @@ export class Game {
     this.feedback.spark(p.x+this.aimDirection.x,1.43,p.z+this.aimDirection.z,this.weapon.id==='shotgun'?1.8:.9,0xffd793,.08);if(this.weapon.id==='shotgun')this.feedback.shake=Math.max(this.feedback.shake,.075);
   }
   gainXp(value){const earned=value*this.stats.xpBonus*(1+Math.min(.5,this.combo*.01))*(this.encounters.event?.id==='harvest'?2:1);this.xp+=earned;this.collected+=earned;this.checkLevel();}
-  offerUpgrade(source='level'){this.upgradeSource=source;this.pendingChoices=choices(this.ranks);if(!this.pendingChoices.length){this.hp=Math.min(this.stats.maxHp,this.hp+30);return;}this.state='upgrade';this.releaseInput();this.sound.level();this.emit('upgrade',this.pendingChoices);}
-  reroll(){if(this.state!=='upgrade'||this.rerolls<=0)return false;this.rerolls--;this.pendingChoices=choices(this.ranks);this.emit('upgrade',this.pendingChoices);return true;}
+  offerUpgrade(source='level'){this.upgradeSource=source;this.pendingChoices=buildChoices(this.ranks);this.selectedUpgrade=-1;if(!this.pendingChoices.length){this.hp=Math.min(this.stats.maxHp,this.hp+30);return;}this.state='upgrade';this.releaseInput();this.sound.level();this.emit('upgrade',this.pendingChoices);}
+  reroll(){if(this.state!=='upgrade'||this.rerolls<=0)return false;this.rerolls--;this.pendingChoices=buildChoices(this.ranks);this.selectedUpgrade=-1;this.emit('upgrade',this.pendingChoices);return true;}
   checkLevel(){
     if(this.state!=='playing'||this.xp<xpNeeded(this.level))return;
     this.xp-=xpNeeded(this.level);this.level++;this.hp=Math.min(this.stats.maxHp,this.hp+this.stats.levelHeal);this.offerUpgrade();
   }
+  selectUpgrade(index){if(this.state!=='upgrade'||!this.pendingChoices[index])return;this.selectedUpgrade=index;this.selectionAt=performance.now();this.emit('upgrade-selection',index);}
+  confirmUpgrade(){if(this.state!=='upgrade'||this.selectedUpgrade<0||performance.now()-this.selectionAt<180)return false;this.chooseUpgrade(this.selectedUpgrade);return true;}
   chooseUpgrade(index){
     if(this.state!=='upgrade'||!this.pendingChoices[index])return;
     const u=this.pendingChoices[index];u.apply(this.stats);this.ranks[u.id]=(this.ranks[u.id]||0)+1;if(u.heal)this.hp=Math.min(this.stats.maxHp,this.hp+u.heal);
     if(u.magnet)this.encounters.magnet=2.5;
     this.upgradesChosen++;this.pendingChoices=[];this.state='playing';this.invuln=Math.max(this.invuln,1.1);this.emit('state','playing');this.emit('toast',`${u.name} · 強化生效`);this.checkEvolution();this.checkLevel();
   }
-  checkEvolution(){if(!this.evolved&&canEvolve(this.weapon.id,this.ranks)){this.evolved=true;this.feedback.rune(this.hunter.position.x,this.hunter.position.z,8,0xffd48b,1.4);this.feedback.shake=.25;this.sound.evolve();this.emit('evolution',this.weapon.evolution.name);return true;}return false;}
+  checkEvolution(){const ready=readyEvolutions(this.ranks,this.weapon,this.skillEvolutions);for(const u of ready){this.skillEvolutions[u.id]=true;if(u.id==='armament')this.evolved=true;if(u.id==='orbit')this.stats.orbit+=2;this.feedback.rune(this.hunter.position.x,this.hunter.position.z,8,0xffd48b,1.4);this.sound.evolve();this.emit('evolution',recipeFor(u,this.weapon).evolution);}return ready.length>0;}
   bulletImpact(b,e){
     e.burn=this.stats.burn?3:0;e.frost=this.stats.frost?1.8:0;this.damageEnemy(e,b.damage,true,b.crit);
     if(!this.evolved)return;
@@ -181,7 +185,7 @@ export class Game {
     this.time=Math.min(RUN_SECONDS,this.time+dt);if(this.time>=RUN_SECONDS){this.finish(this.expedition.complete());return;}
     this.shotClock=Math.max(0,this.shotClock-dt);this.invuln=Math.max(0,this.invuln-dt);this.dashLeft=Math.max(0,this.dashLeft-dt);this.novaLeft=Math.max(0,this.novaLeft-dt);this.hurtFlash=Math.max(0,this.hurtFlash-dt*2);
     this.hp=Math.min(this.stats.maxHp,this.hp+this.stats.regen*dt);
-    this.director.update(dt);this.expedition.update(dt);if(this.state!=='playing')return;this.comboLeft=Math.max(0,this.comboLeft-dt);if(this.comboLeft===0)this.combo=0;this.encounters.update(dt);if(this.state!=='playing')return;
+    this.director.update(dt);this.expedition.update(dt);if(this.state!=='playing')return;this.comboLeft=Math.max(0,this.comboLeft-dt);if(this.comboLeft===0)this.combo=0;this.encounters.update(dt);this.arsenal.update(dt);if(this.state!=='playing')return;
     this.ray.setFromCamera(this.pointer,this.camera);this.ray.ray.intersectPlane(FLOOR,this.aim);
     const p=this.hunter.position;
     if(this.touchAim.lengthSq()>.03){this.aim.set(p.x+this.touchAim.x*10,0,p.z+this.touchAim.y*10);}
@@ -191,7 +195,7 @@ export class Game {
     const m=this.movement();let dx=m.x*this.stats.speed*this.expedition.slow*dt,dz=m.z*this.stats.speed*this.expedition.slow*dt;
     if(this.dashTimer>0){this.dashTimer-=dt;dx=this.dashDirection.x*28*dt;dz=this.dashDirection.z*28*dt;this.particle(p.x,.4,p.z,2,2);}
     const beforeX=p.x,beforeZ=p.z;this.moveAndCollide(p,dx,dz,.46);this.director.distance+=Math.hypot(p.x-beforeX,p.z-beforeZ);
-    const moving=Math.hypot(dx,dz)>.001;this.hunter.userData.legs.forEach((leg,i)=>leg.rotation.x=moving?Math.sin(this.time*19+i*Math.PI)*.48:0);
+    const moving=Math.hypot(dx,dz)>.001;this.hunter.userData.moving=moving;this.hunter.userData.legs.forEach((leg,i)=>leg.rotation.x=moving?Math.sin(this.time*19+i*Math.PI)*.48:0);
     this.hunter.userData.scarf.rotation.z=Math.sin(this.time*9)*.18;this.hunter.userData.scarfTail.rotation.y=Math.sin(this.time*7)*.28;
     this.hunter.visible=this.invuln<=0||Math.floor(this.time*20)%2===0;
     if((this.mouseDown||this.auto||this.touchAim.lengthSq()>.03)&&this.shotClock<=0){this.shoot();this.shotClock=this.stats.fireRate*this.weapon.interval*(this.evolved&&this.weapon.id==='pistols'?.8:1)*(this.encounters.fury>0?.5:1);}
@@ -254,7 +258,7 @@ export class Game {
     this.camera.position.set(this.cameraTarget.x+(Math.random()-.5)*shake,26,this.cameraTarget.z+19+(Math.random()-.5)*shake);this.camera.lookAt(this.cameraTarget);this.camera.updateMatrixWorld();this.feedback.update(this.state==='playing'?dt:0);
     this.playerLight.position.set(p.x,3,p.z);
     this.flames.forEach((f,i)=>f.scale.setScalar(1+Math.sin(now*.009+i)*.17));
-    animateHunter(this.hunter,now*.001,this.feedback.reduced?0:1);this.renderer.render(this.scene,this.camera);this.emit('frame',this.snapshot());requestAnimationFrame(this.frame);
+    animateHunter(this.hunter,this.time,this.feedback.reduced?0:1);this.renderer.render(this.scene,this.camera);this.emit('frame',this.snapshot());requestAnimationFrame(this.frame);
   }
   snapshot(){return {state:this.state,time:this.time,hp:this.hp,maxHp:this.stats.maxHp,kills:this.kills,level:this.level,xp:this.xp,xpNeeded:xpNeeded(this.level),dash:this.dashLeft,dashMax:this.stats.dashCooldown,nova:this.novaLeft,novaMax:this.stats.novaCooldown,boss:this.boss?this.boss.hp/this.boss.maxHp:0,auto:this.auto,hurt:this.hurtFlash,enemies:this.enemies.length,bullets:this.bullets.length,gems:this.gems.length,position:{x:this.hunter.position.x,z:this.hunter.position.z},fired:this.fired,collected:this.collected,upgradesChosen:this.upgradesChosen,dashesUsed:this.dashesUsed,novasUsed:this.novasUsed,combo:this.combo,comboLeft:this.comboLeft,bestCombo:this.bestCombo,evolved:this.evolved,weapon:this.evolved?this.weapon.evolution.name:this.weapon.name,loadout:this.loadout,director:this.director.snapshot(),expedition:this.expedition.snapshot(),encounter:this.encounters.snapshot()};}
 }

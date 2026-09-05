@@ -10,11 +10,11 @@ hunters.push(
 );
 export const weapons = [
   { id: 'pistols', name: '銀誓雙槍', description: '穩定連射，適合走位與精準點殺。', symbol: 'Ⅱ', damage: 1, interval: 1, count: 1, spread: .12, speed: 38, life: .9, pierce: 0,
-    evolution: {name:'熾天使',requires:{damage:2,rate:2},description:'祝聖銀彈 II + 午夜扳機 II → 銀彈追蹤敵人，射速再提升 20%。'} },
+    evolution: {name:'熾天使',requires:{armament:5,rate:1},description:'銀誓雙槍 V + 午夜扳機 I → 銀彈追蹤敵人，射速再提升 20%。'} },
   { id: 'shotgun', name: '喪鐘霰彈', description: '近距離五發散射，將包圍網轟開。', symbol: '⋔', damage: .64, interval: 2.8, count: 5, spread: .14, speed: 32, life: .43, pierce: 0,
-    evolution: {name:'末日喪鐘',requires:{spread:2,health:1},description:'雙生獠牙 II + 猩紅契約 I → 命中產生小型爆炸，擴散 45% 傷害。'} },
+    evolution: {name:'末日喪鐘',requires:{armament:5,health:1},description:'喪鐘霰彈 V + 猩紅契約 I → 命中產生小型爆炸，擴散 45% 傷害。'} },
   { id: 'crossbow', name: '黑棘弩', description: '高傷貫穿箭，一箭清除整列敵人。', symbol: '↟', damage: 2.7, interval: 2.65, count: 1, spread: .08, speed: 48, life: .95, pierce: 2,
-    evolution: {name:'雷鳴黑棘',requires:{pierce:2,crit:1},description:'穿心誓約 II + 致命獵殺 I → 命中觸發連鎖雷擊，跳躍至附近 3 個敵人。'} },
+    evolution: {name:'雷鳴黑棘',requires:{armament:5,pierce:1},description:'黑棘弩 V + 穿心誓約 I → 命中觸發連鎖雷擊，跳躍至附近 3 個敵人。'} },
 ];
 export const contracts = [
   {id:'standard',name:'長夜狩獵',description:'標準敵潮，完成所選任務。',reward:1,spawn:1,apply:()=>{}},
