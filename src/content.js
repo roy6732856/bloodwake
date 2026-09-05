@@ -21,7 +21,7 @@ export const events = [
   {id:'swarm',name:'血蝠遷徙',description:'血蝠持續湧入，敵人掉落額外經驗',duration:18,color:0xa17cce},
   {id:'storm',name:'猩紅星雨',description:'離開地上的紅色預警圈',duration:18,color:0xe7526c},
 ];
-export function normalizeLoadout(raw={}) {return {hunter:hunters.find(h=>h.id===raw.hunter)?.id||'hunter',weapon:weapons.find(w=>w.id===raw.weapon)?.id||'pistols',contract:contracts.find(c=>c.id===raw.contract)?.id||'standard'};}
+export function normalizeLoadout(raw={}) {return {hunter:hunters.find(h=>h.id===raw.hunter)?.id||'hunter',weapon:weapons.find(w=>w.id===raw.weapon)?.id||'pistols',contract:contracts.find(c=>c.id===raw.contract)?.id||'standard',director:raw.director==='classic'?'classic':'adaptive',trial:['none','pursuit','eclipse'].includes(raw.trial)?raw.trial:'none'};}
 export function configureLoadout(stats,raw){const loadout=normalizeLoadout(raw);hunters.find(h=>h.id===loadout.hunter).apply(stats);contracts.find(c=>c.id===loadout.contract).apply(stats);return loadout;}
 export function canEvolve(weaponId,ranks){const w=weapons.find(w=>w.id===weaponId);return !!w&&Object.entries(w.evolution.requires).every(([id,n])=>(ranks[id]||0)>=n);}
 export const achievements = [

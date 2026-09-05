@@ -1,0 +1,6 @@
+import { recommend, trials, sanitizeHistory } from './bloodmoon.js';
+export function moonMarkup(selection,save){
+  const advice=recommend(save.history),history=sanitizeHistory(save.history),gun={pistols:'銀誓雙槍',shotgun:'喪鐘霰彈',crossbow:'黑棘弩'};
+  return `<section class="moon-preparation"><div class="sub">血月意志 · ${advice.confidence}</div><h3>獵場開始記得你</h3><p>${advice.reason}</p><div class="moon-suggestion">建議兵器：${gun[advice.weapon]} · 建議試煉：${trials.find(t=>t.id===advice.trial).name}</div><div class="moon-modes">${[['adaptive','血月意志','依局內壓力調整敵潮與恢復機會'],['classic','經典節奏','沿用固定敵潮，不調整節奏']].map(([id,name,desc])=>`<button data-select-director="${id}" aria-pressed="${selection.director===id}" class="${selection.director===id?'selected':''}"><strong>${name}</strong><small>${desc}</small></button>`).join('')}</div><p class="moon-caption">推薦來自最近 ${history.length} 局的規則分析；目前尚未使用訓練模型。</p></section>
+  <div class="loadout-section"><h3><span>額外試煉 · 自行選擇</span></h3><div class="loadout-grid contracts">${trials.map(t=>`<button class="loadout-card ${selection.trial===t.id?'selected':''}" data-select-trial="${t.id}" aria-pressed="${selection.trial===t.id}"><strong>${t.name}${t.id===advice.trial?' <small>✦ 建議</small>':''}</strong><p>${t.description}</p></button>`).join('')}</div><p class="moon-caption">試煉收益與契約相乘。包抄保留逃生方向，星雨會先出現紅圈預警。</p></div>`;
+}

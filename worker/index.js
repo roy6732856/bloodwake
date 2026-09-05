@@ -28,7 +28,7 @@ async function readBody(request) {
 }
 async function api(request, env) {
   const url = new URL(request.url), path = url.pathname;
-  if (path === '/api/health' && request.method === 'GET') return json({ cloud: Boolean(env.DB), schema: 1 });
+  if (path === '/api/health' && request.method === 'GET') return json({ cloud: Boolean(env.DB), schema: 1, version: '0.4.0' });
   if (path !== '/api/save') return json({ error: 'not_found' }, 404);
   if (!['GET', 'PUT'].includes(request.method)) return json({ error: 'method_not_allowed' }, 405);
   if (request.method === 'PUT' && request.headers.get('origin') !== url.origin) return json({ error: 'origin' }, 403);
@@ -46,7 +46,12 @@ async function api(request, env) {
   try { body = await readBody(request); } catch { return json({ error: 'invalid_body' }, 400); }
   if (!Number.isSafeInteger(body?.version) || body.version < 0 ||
       !/^[a-f0-9-]{36}$/.test(body.requestId || '') || !validSave(body.save)) return json({ error: 'invalid_save' }, 400);
-  const saveJSON = JSON.stringify(sanitizeSave(body.save)), now = Date.now();
+  const clean = sanitizeSave(body.save);
+  if (!Object.hasOwn(body.save, 'history') && body.version > 0) {
+    const previous = await find();
+    if (previous) clean.history = sanitizeSave(JSON.parse(previous.save_json)).history;
+  }
+  const saveJSON = JSON.stringify(clean), now = Date.now();
   // A compare-and-swap prevents two devices from silently replacing each other.
   let result;
   if (body.version === 0) {

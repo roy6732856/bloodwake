@@ -1,11 +1,13 @@
+import { sanitizeHistory, trials } from './bloodmoon.js';
 export const RUN_SECONDS = 300;
-export const blankSave = () => ({ souls: 0, best: 0, runs: 0, wins: 0, achievements: [], ranks: { power: 0, vitality: 0, reach: 0 } });
+export const blankSave = () => ({ souls: 0, best: 0, runs: 0, wins: 0, achievements: [], history: [], ranks: { power: 0, vitality: 0, reach: 0 } });
 export function sanitizeSave(raw) {
   const save = blankSave();
   if (!raw || typeof raw !== 'object') return save;
   for (const k of ['souls', 'best', 'runs', 'wins']) save[k] = Math.max(0, Math.min(k === 'best' ? 300 : 1e7, Math.floor(Number(raw[k]) || 0)));
   for (const k of Object.keys(save.ranks)) save.ranks[k] = Math.max(0, Math.min(5, Math.floor(Number(raw.ranks?.[k]) || 0)));
   save.achievements=Array.isArray(raw.achievements)?[...new Set(raw.achievements.filter(x=>['firstblood','warden','evolution','combo','dawn'].includes(x)))]:[];
+  save.history = sanitizeHistory(raw.history);
   save.wins = Math.min(save.wins, save.runs);
   return save;
 }
@@ -27,7 +29,7 @@ export function statsFor(save) {
 export function rewardFor(kills, time, win) { return Math.floor(kills / 8) + Math.floor(time / 20) + (win ? 20 : 0); }
 export function settleRun(save, result) {
   const multiplier={standard:1,swarm:1.35,glass:1.5}[result.contract]||1;
-  const reward = Math.floor(rewardFor(result.kills, result.time, result.win)*multiplier);
+  const reward = Math.floor(rewardFor(result.kills, result.time, result.win)*multiplier*(trials.find(t=>t.id===result.trial)?.reward||1));
   save.souls += reward; save.runs++; if (result.win) save.wins++;
   save.best = Math.max(save.best, Math.floor(Math.min(300, result.time))); return reward;
 }

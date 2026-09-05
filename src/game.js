@@ -1,3 +1,4 @@
+import { BloodmoonDirector } from './director.js';
 import * as THREE from '../vendor/three.module.js';
 import { buildArena, createHunter, createEnemy, dressHunter, mat } from './models.js';
 import { Sound } from './audio.js';
@@ -33,23 +34,23 @@ export class Game {
     this.bulletGeo=new THREE.CylinderGeometry(.035,.035,.9,5);this.bulletGeo.rotateX(Math.PI/2);this.bulletMat=new THREE.MeshBasicMaterial({color:0xffe8b5});
     this.particleGeo=new THREE.IcosahedronGeometry(.075,0);this.particleMats=[new THREE.MeshBasicMaterial({color:0xe9b87b}),new THREE.MeshBasicMaterial({color:0x9e4660}),new THREE.MeshBasicMaterial({color:0x67e5d7})];
     this.ringGeo=new THREE.RingGeometry(.94,1,64);this.ringGeo.rotateX(-Math.PI/2);
-    this.loadout=normalizeLoadout();this.encounters=new Encounters(this);this.feedback=new CombatFeedback(this);
+    this.loadout=normalizeLoadout();this.encounters=new Encounters(this);this.feedback=new CombatFeedback(this);this.director=new BloodmoonDirector(this);
     this.reset();this.state='menu';this.demo();this.resize();
     this.attachInput();this.last=performance.now();this.accumulator=0;this.frame=this.frame.bind(this);requestAnimationFrame(this.frame);
   }
   reset() {
-    this.encounters.reset();this.feedback.reset();
+    this.encounters.reset();this.feedback.reset();this.director.reset();this.runId=crypto.randomUUID();
     for(const r of this.rings)r.mesh.material.dispose();
     this.entities.clear();this.enemies=[];this.bullets=[];this.gems=[];this.particles=[];this.rings=[];
     this.stats=statsFor(this.save);configureLoadout(this.stats,this.loadout);this.weapon=weapons.find(w=>w.id===this.loadout.weapon);this.contract=contracts.find(c=>c.id===this.loadout.contract);this.hp=this.stats.maxHp;this.time=0;this.kills=0;this.level=1;this.xp=0;this.ranks={};this.pendingChoices=[];this.spawnClock=1.8;this.shotClock=0;this.dashLeft=0;this.dashTimer=0;this.novaLeft=0;this.invuln=0;this.hurtFlash=0;this.nextBoss=60;this.boss=null;this.cameraTarget=new THREE.Vector3();this.hunter.position.set(0,0,0);this.hunter.rotation.y=0;this.hunter.visible=true;this.keys.clear();this.mouseDown=false;this.auto=false;this.dashDirection=new THREE.Vector3(0,0,-1);this.touchMove.set(0,0);this.touchAim.set(0,0);this.fired=0;this.collected=0;this.upgradesChosen=0;this.dashesUsed=0;this.novasUsed=0;this.bossKills=0;this.combo=0;this.comboLeft=0;this.bestCombo=0;this.evolved=false;this.rerolls=1;this.upgradeSource='level';
   }
   demo(){for(let i=0;i<9;i++){const a=i*2.399;this.spawnEnemy(i%4===0?'brute':'ghoul',Math.cos(a)*(8+i*.8),Math.sin(a)*(8+i*.8));}for(let i=0;i<12;i++){const a=i*1.97;this.dropGem(Math.cos(a)*(3+i*.6),Math.sin(a)*(3+i*.6),2);}}
-  start(loadout=this.loadout){this.loadout=normalizeLoadout(loadout);this.reset();dressHunter(this.hunter,this.loadout);this.state='playing';this.sound.unlock();for(let i=0;i<5;i++){const a=i*Math.PI*2/5;this.spawnEnemy('ghoul',Math.cos(a)*11,Math.sin(a)*11);}this.emit('state','playing');this.emit('toast',`${this.weapon.name} · ${this.contract.name}`);}
+  start(loadout=this.loadout){this.loadout=normalizeLoadout(loadout);this.reset();this.director.start();dressHunter(this.hunter,this.loadout);this.state='playing';this.sound.unlock();for(let i=0;i<5;i++){const a=i*Math.PI*2/5;this.spawnEnemy('ghoul',Math.cos(a)*11,Math.sin(a)*11);}this.emit('state','playing');this.emit('toast',`${this.weapon.name} · ${this.contract.name}`);}
   pause(){if(this.state!=='playing')return;this.state='paused';this.releaseInput();this.emit('state','paused');}
   resume(){if(this.state!=='paused')return;this.state='playing';this.releaseInput();this.emit('state','playing');}
   toMenu(){this.reset();this.state='menu';this.demo();this.emit('state','menu');}
   releaseInput(){this.keys.clear();this.mouseDown=false;this.touchMove.set(0,0);this.touchAim.set(0,0);}
-  finish(win){if(this.state!=='playing')return;this.state=win?'victory':'defeat';this.hunter.visible=true;this.releaseInput();this.emit('end',{win,kills:this.kills,time:this.time,level:this.level,contract:this.loadout.contract,weapon:this.weapon.name,bestCombo:this.bestCombo,bossKills:this.bossKills,evolved:this.evolved,chests:this.encounters.chestsOpened});}
+  finish(win,abandoned=false){if(this.state!=='playing')return;this.state=win?'victory':'defeat';this.hunter.visible=true;this.releaseInput();this.emit('end',{win,kills:this.kills,time:this.time,level:this.level,contract:this.loadout.contract,weapon:this.weapon.name,bestCombo:this.bestCombo,bossKills:this.bossKills,evolved:this.evolved,chests:this.encounters.chestsOpened,runId:this.runId,weaponId:this.loadout.weapon,mode:this.loadout.director,trial:this.loadout.trial,damageTaken:this.director.damageTaken,distance:this.director.distance,dashes:this.dashesUsed,director:this.director.snapshot(),abandoned});}
   attachInput(){
     window.addEventListener('resize',()=>this.resize());
     window.addEventListener('keydown',e=>{
@@ -112,7 +113,7 @@ export class Game {
   }
   hurt(amount){
     if(this.invuln>0||this.state!=='playing')return;
-    this.hp=Math.max(0,this.hp-amount);this.invuln=.7;this.hurtFlash=.6;this.combo=0;this.comboLeft=0;this.feedback.shake=.16;this.sound.hurt();this.ring(this.hunter.position.x,this.hunter.position.z,0xd83455,1.4,.25);
+    this.director.hurt(Math.min(this.hp,amount));this.hp=Math.max(0,this.hp-amount);this.invuln=.7;this.hurtFlash=.6;this.combo=0;this.comboLeft=0;this.feedback.shake=.16;this.sound.hurt();this.ring(this.hunter.position.x,this.hunter.position.z,0xd83455,1.4,.25);
     if(this.hp<=0)this.finish(false);
   }
   moveAndCollide(position,dx,dz,radius){
@@ -170,7 +171,7 @@ export class Game {
     this.time=Math.min(RUN_SECONDS,this.time+dt);if(this.time>=RUN_SECONDS){this.finish(true);return;}
     this.shotClock=Math.max(0,this.shotClock-dt);this.invuln=Math.max(0,this.invuln-dt);this.dashLeft=Math.max(0,this.dashLeft-dt);this.novaLeft=Math.max(0,this.novaLeft-dt);this.hurtFlash=Math.max(0,this.hurtFlash-dt*2);
     this.hp=Math.min(this.stats.maxHp,this.hp+this.stats.regen*dt);
-    this.comboLeft=Math.max(0,this.comboLeft-dt);if(this.comboLeft===0)this.combo=0;this.encounters.update(dt);if(this.state!=='playing')return;
+    this.director.update(dt);this.comboLeft=Math.max(0,this.comboLeft-dt);if(this.comboLeft===0)this.combo=0;this.encounters.update(dt);if(this.state!=='playing')return;
     this.ray.setFromCamera(this.pointer,this.camera);this.ray.ray.intersectPlane(FLOOR,this.aim);
     const p=this.hunter.position;
     if(this.touchAim.lengthSq()>.03){this.aim.set(p.x+this.touchAim.x*10,0,p.z+this.touchAim.y*10);}
@@ -179,12 +180,12 @@ export class Game {
     this.hunter.rotation.y=Math.atan2(-this.aimDirection.x,-this.aimDirection.z);
     const m=this.movement();let dx=m.x*this.stats.speed*dt,dz=m.z*this.stats.speed*dt;
     if(this.dashTimer>0){this.dashTimer-=dt;dx=this.dashDirection.x*28*dt;dz=this.dashDirection.z*28*dt;this.particle(p.x,.4,p.z,2,2);}
-    this.moveAndCollide(p,dx,dz,.46);
+    const beforeX=p.x,beforeZ=p.z;this.moveAndCollide(p,dx,dz,.46);this.director.distance+=Math.hypot(p.x-beforeX,p.z-beforeZ);
     const moving=Math.hypot(dx,dz)>.001;this.hunter.userData.legs.forEach((leg,i)=>leg.rotation.x=moving?Math.sin(this.time*19+i*Math.PI)*.48:0);
     this.hunter.userData.scarf.rotation.z=Math.sin(this.time*9)*.18;this.hunter.userData.scarfTail.rotation.y=Math.sin(this.time*7)*.28;
     this.hunter.visible=this.invuln<=0||Math.floor(this.time*20)%2===0;
     if((this.mouseDown||this.auto||this.touchAim.lengthSq()>.03)&&this.shotClock<=0){this.shoot();this.shotClock=this.stats.fireRate*this.weapon.interval*(this.evolved&&this.weapon.id==='pistols'?.8:1)*(this.encounters.fury>0?.5:1);}
-    this.spawnClock-=dt;if(this.spawnClock<=0){this.spawnWave();this.spawnClock=Math.max(.16,(1.05-this.time*.003)/this.contract.spawn/(this.encounters.event?.id==='swarm'?1.6:1));}
+    this.spawnClock-=dt;if(this.spawnClock<=0){this.spawnWave();this.spawnClock=Math.max(.16,(1.05-this.time*.003)/this.contract.spawn/this.director.spawn/(this.encounters.event?.id==='swarm'?1.6:1));}
     if(this.time>=this.nextBoss){
       if(!this.boss){this.spawnEnemy('boss',clamp(p.x+12,-25,25),clamp(p.z-14,-25,25));this.emit('toast','典獄長甦醒 · 留意猩紅衝擊波');}
       this.nextBoss+=60;
@@ -244,5 +245,5 @@ export class Game {
     this.flames.forEach((f,i)=>f.scale.setScalar(1+Math.sin(now*.009+i)*.17));
     this.renderer.render(this.scene,this.camera);this.emit('frame',this.snapshot());requestAnimationFrame(this.frame);
   }
-  snapshot(){return {state:this.state,time:this.time,hp:this.hp,maxHp:this.stats.maxHp,kills:this.kills,level:this.level,xp:this.xp,xpNeeded:xpNeeded(this.level),dash:this.dashLeft,dashMax:this.stats.dashCooldown,nova:this.novaLeft,novaMax:this.stats.novaCooldown,boss:this.boss?this.boss.hp/this.boss.maxHp:0,auto:this.auto,hurt:this.hurtFlash,enemies:this.enemies.length,bullets:this.bullets.length,gems:this.gems.length,position:{x:this.hunter.position.x,z:this.hunter.position.z},fired:this.fired,collected:this.collected,upgradesChosen:this.upgradesChosen,dashesUsed:this.dashesUsed,novasUsed:this.novasUsed,combo:this.combo,comboLeft:this.comboLeft,bestCombo:this.bestCombo,evolved:this.evolved,weapon:this.evolved?this.weapon.evolution.name:this.weapon.name,loadout:this.loadout,encounter:this.encounters.snapshot()};}
+  snapshot(){return {state:this.state,time:this.time,hp:this.hp,maxHp:this.stats.maxHp,kills:this.kills,level:this.level,xp:this.xp,xpNeeded:xpNeeded(this.level),dash:this.dashLeft,dashMax:this.stats.dashCooldown,nova:this.novaLeft,novaMax:this.stats.novaCooldown,boss:this.boss?this.boss.hp/this.boss.maxHp:0,auto:this.auto,hurt:this.hurtFlash,enemies:this.enemies.length,bullets:this.bullets.length,gems:this.gems.length,position:{x:this.hunter.position.x,z:this.hunter.position.z},fired:this.fired,collected:this.collected,upgradesChosen:this.upgradesChosen,dashesUsed:this.dashesUsed,novasUsed:this.novasUsed,combo:this.combo,comboLeft:this.comboLeft,bestCombo:this.bestCombo,evolved:this.evolved,weapon:this.evolved?this.weapon.evolution.name:this.weapon.name,loadout:this.loadout,director:this.director.snapshot(),encounter:this.encounters.snapshot()};}
 }

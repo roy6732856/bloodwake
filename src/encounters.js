@@ -27,7 +27,7 @@ export class Encounters {
   dropPowerup(x,z,kind){if(this.powerups.length>=12)return;const mesh=new THREE.Mesh(new THREE.OctahedronGeometry(.32),new THREE.MeshBasicMaterial({color:kind==='fury'?0xffb75e:0x71f4d4}));mesh.position.set(x,.5,z);this.game.entities.add(mesh);this.powerups.push({mesh,kind,life:22});}
   update(dt){
     const g=this.game,p=g.hunter.position;this.fury=Math.max(0,this.fury-dt);this.magnet=Math.max(0,this.magnet-dt);
-    if(g.time>=this.nextEvent){this.startEvent();this.nextEvent+=50;}
+    if(g.time>=this.nextEvent){this.startEvent(g.director.event());this.nextEvent+=50;}
     if(g.time>=this.nextChest){this.spawnChest();this.nextChest+=55;}
     if(this.event){this.event.left-=dt;if(this.event.id==='storm'){this.stormClock-=dt;if(this.stormClock<=0){this.warning(p.x,p.z);this.stormClock=2.8;}}if(this.event.left<=0)this.event=null;}
     this.nearestChest=null;let near=Infinity;for(const c of this.chests){const d=c.mesh.position.distanceTo(p);c.halo.scale.setScalar(1+Math.sin(g.time*3)*.07);if(d<near){near=d;this.nearestChest=c;}}this.chestDistance=near;

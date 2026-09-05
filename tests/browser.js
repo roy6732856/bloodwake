@@ -4,6 +4,7 @@ frame.onload=()=>out.textContent='Ready';
 button.onclick=async()=>{
   const g=frame.contentWindow.__bloodwake,doc=frame.contentDocument,lines=[];if(!g){out.textContent='FAIL: game did not boot';return;}
   const original=JSON.stringify(g.save),persisted=localStorage.getItem('bloodwake.save.v1');g.sound.enabled=false;button.disabled=true;
+  await new Promise(resolve=>setTimeout(resolve,100));
   function assert(ok,message){if(!ok)throw Error(message);}
   function test(name,fn){try{Object.assign(g.save,blankSave());g.start({hunter:'hunter',weapon:'pistols',contract:'standard'});fn();lines.push('PASS '+name);}catch(e){lines.push('FAIL '+name+': '+e.message);}out.textContent=lines.join('\n');}
   function step(seconds){for(let i=0;i<Math.ceil(seconds*60);i++)g.update(1/60);}
@@ -28,6 +29,18 @@ button.onclick=async()=>{
   test('Caster launches an orb and meteor gives a warning before damage',()=>{clearEnemies();const e=g.spawnEnemy('caster',0,-7);e.speed=0;e.attack=0;step(.1);assert(g.encounters.shots.length>0,'caster never fired');g.encounters.warning(0,0,2.8);const hp=g.hp;step(.5);assert(g.hp===hp,'meteor hit before warning ended');step(1.1);assert(g.hp<hp,'meteor damage missing');});
   test('Combo rewards speed, resets on damage and harvest doubles XP',()=>{clearEnemies();for(let i=0;i<20;i++){const e=g.spawnEnemy('ghoul',10,10);g.damageEnemy(e,999,false);}assert(g.bestCombo===20&&g.combo===20,'combo not counted');g.invuln=0;g.hurt(1);assert(g.combo===0,'damage did not break combo');g.level=50;g.xp=0;g.encounters.startEvent('harvest');g.gainXp(5);assert(g.xp===10,'harvest XP multiplier incorrect');});
   test('New effects use loaded generated textures and create real hit feedback',()=>{clearEnemies();const e=g.spawnEnemy('brute',2,0);g.damageEnemy(e,44,true,true);assert(g.feedback.impact.image?.width>0&&g.feedback.sigil.image?.width>0,'VFX image not loaded');assert(doc.querySelector('.damage-number.critical'),'critical damage number missing');assert(g.feedback.sprites.length>0&&g.feedback.shake>0,'impact spark/shake absent');});
+  test('Bloodmoon crisis recovery, run memory and feedback update the next recommendation',()=>{
+    clearEnemies();g.time=10;g.hp=10;step(.1);assert(g.director.phase==='recover','critical health did not trigger recovery');
+    assert(g.director.spawn===.65,'recovery spawn rate wrong');g.time=30;g.finish(false);
+    const id=g.runId;assert(g.save.history.some(r=>r.id===id),'battle summary not stored');
+    doc.querySelector('[data-rating="hard"]').click();assert(g.save.history.find(r=>r.id===id).rating==='hard','feedback not saved');
+    doc.querySelector('#prepare-next').click();assert(doc.querySelector('.moon-preparation').textContent.includes('舒緩'),'recommendation ignored hard feedback');
+  });
+  test('Selected trial and classic mode deploy through the real loadout controls',()=>{
+    g.toMenu();doc.querySelector('#start').click();doc.querySelector('[data-select-director="classic"]').click();doc.querySelector('[data-select-trial="pursuit"]').click();doc.querySelector('#deploy').click();
+    assert(!g.director.enabled&&g.director.trial==='pursuit','loadout did not reach director');clearEnemies();g.time=35;step(.1);assert(g.director.pending.length>0,'trial warning absent');
+    const time=g.time,pending=g.director.pending[0].left;g.pause();step(3);assert(g.time===time&&g.director.pending[0].left===pending,'pause consumed warnings');g.resume();step(2.6);assert(g.enemies.length>0,'announced trial did not spawn enemies');
+  });
   test('All three weapons complete accelerated five-minute content loops without runtime failure',()=>{
     for(const weapon of ['pistols','shotgun','crossbow']){
       g.start({weapon});g.stats.maxHp=g.hp=1e7;g.sound.enabled=false;g.auto=true;

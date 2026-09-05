@@ -2,7 +2,7 @@ import { CloudSave, BACKUP_KEY } from './cloud-save.js';
 import { formatTime, sanitizeSave } from './progression.js';
 
 const labels = { local: '本機存檔', ready: '雲端已同步', syncing: '同步中…', pending: '等待同步', conflict: '存檔需要選擇', deferred: '回選單同步', unavailable: '本機模式' };
-const summary = save => `<strong>${save.souls} 殘魂</strong><span>${save.runs} 局 · 最佳 ${formatTime(save.best)} · 生還 ${save.wins} 次</span><small>永久強化 ${save.ranks.power} / ${save.ranks.vitality} / ${save.ranks.reach} · 印記 ${save.achievements.length} / 5</small>`;
+const summary = save => `<strong>${save.souls} 殘魂</strong><span>${save.runs} 局 · 最佳 ${formatTime(save.best)} · 生還 ${save.wins} 次</span><small>永久強化 ${save.ranks.power} / ${save.ranks.vitality} / ${save.ranks.reach} · 印記 ${save.achievements.length} / 5 · 記憶 ${save.history.length} 局</small>`;
 const $ = id => document.getElementById(id);
 export function connectCloud({ getSave, applySave, canApply, showDialog, closeDialog, isOpen }) {
   let notice = '', preview = null;
@@ -20,7 +20,7 @@ export function connectCloud({ getSave, applySave, canApply, showDialog, closeDi
     const typed = $('recovery-input')?.value || '';
     const busy = cloud.busy ? 'disabled' : '';
     showDialog('cloud', `<div class="sub">獵人的記憶 · ${labels[cloud.status]}</div><h2>雲端存檔</h2>
-      <p>殘魂、永久強化、印記與最佳紀錄，隨你前往下一台裝置。<br>每局結算與強化後同步；進行中的戰局不會存入雲端。</p>
+      <p>殘魂、永久強化、血月記憶與最佳紀錄，隨你前往下一台裝置。<br>每局結算與強化後同步；進行中的戰局不會存入雲端。</p>
       <div class="save-summary">${summary(sanitizeSave(getSave()))}</div>
       <p id="cloud-message" role="status" class="cloud-message"></p>
       ${!cloud.available ? '<p>目前為本機模式。部署線上版後即可啟用雲端；現在可匯出進度，之後再帶到線上版。</p>' : cloud.conflict ?
