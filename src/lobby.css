@@ -1,4 +1,5 @@
 /* THE SANCTUM: live 3D centre, open editorial wings, illustrated roster. */
+.volume-label{white-space:nowrap}.volume-label input{flex:1}
 .sanctum{--role-color:#ba2546;--lobby-gold:#c4a779;display:block;background:linear-gradient(90deg,#060a10ce,transparent 39%,transparent 64%,#060a10ba),linear-gradient(0deg,#05090eed,transparent 25%);overflow-y:auto;overflow-x:hidden;color:#e7dcc6;scrollbar-width:thin;scrollbar-color:#796647 #080e14}
 .lobby-shell{min-height:100dvh;height:100dvh;max-width:1920px;margin:auto;display:grid;grid-template-rows:76px minmax(310px,1fr) 116px 30px;padding:0 38px 10px;gap:16px}
 .lobby-header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ad8a5442;gap:20px}
