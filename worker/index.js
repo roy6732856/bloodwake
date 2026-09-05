@@ -28,7 +28,7 @@ async function readBody(request) {
 }
 async function api(request, env) {
   const url = new URL(request.url), path = url.pathname;
-  if (path === '/api/health' && request.method === 'GET') return json({ cloud: Boolean(env.DB), schema: 1, version: '0.5.0' });
+  if (path === '/api/health' && request.method === 'GET') return json({ cloud: Boolean(env.DB), schema: 1, version: '0.6.0' });
   if (path !== '/api/save') return json({ error: 'not_found' }, 404);
   if (!['GET', 'PUT'].includes(request.method)) return json({ error: 'method_not_allowed' }, 405);
   if (request.method === 'PUT' && request.headers.get('origin') !== url.origin) return json({ error: 'origin' }, 403);
@@ -47,9 +47,18 @@ async function api(request, env) {
   if (!Number.isSafeInteger(body?.version) || body.version < 0 ||
       !/^[a-f0-9-]{36}$/.test(body.requestId || '') || !validSave(body.save)) return json({ error: 'invalid_save' }, 400);
   const clean = sanitizeSave(body.save);
-  if (!Object.hasOwn(body.save, 'history') && body.version > 0) {
+  const missingHistory = !Object.hasOwn(body.save, 'history');
+  const missingExpedition = Array.isArray(body.save.history) && body.save.history.some(r => r && ['map','mission','hunter'].some(k => !Object.hasOwn(r,k)));
+  if (body.version > 0 && (missingHistory || missingExpedition)) {
     const previous = await find();
-    if (previous) clean.history = sanitizeSave(JSON.parse(previous.save_json)).history;
+    if (previous) {
+      const history = sanitizeSave(JSON.parse(previous.save_json)).history;
+      if (missingHistory) clean.history = history;
+      else for (const entry of clean.history) {
+        const original = body.save.history.find(r => r?.id === entry.id), saved = history.find(r => r.id === entry.id);
+        if (original && saved) for (const key of ['map','mission','hunter']) if (!Object.hasOwn(original,key)) entry[key] = saved[key];
+      }
+    }
   }
   const saveJSON = JSON.stringify(clean), now = Date.now();
   // A compare-and-swap prevents two devices from silently replacing each other.

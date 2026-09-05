@@ -1,7 +1,10 @@
+import {makeArena} from './arenas.js';
+import {maps} from './world-content.js';
+import {Expedition} from './expedition.js';
 import { animateHunter } from './hunter-model.js';
 import { BloodmoonDirector } from './director.js';
 import * as THREE from '../vendor/three.module.js';
-import { buildArena, createHunter, createEnemy, dressHunter, mat } from './models.js';
+import { createHunter, createEnemy, dressHunter, mat } from './models.js';
 import { Sound } from './audio.js';
 import { statsFor, xpNeeded, choices, RUN_SECONDS } from './progression.js';
 import { normalizeLoadout, configureLoadout, weapons, contracts, canEvolve } from './content.js';
@@ -26,7 +29,7 @@ export class Game {
     this.scene.add(new THREE.HemisphereLight(0xc7d2dc,0x34404b,2.5));
     const moon=new THREE.DirectionalLight(0xbbcbdc,3.1);moon.position.set(-12,24,8);moon.castShadow=true;moon.shadow.mapSize.set(2048,2048);Object.assign(moon.shadow.camera,{left:-35,right:35,top:35,bottom:-35,near:1,far:90});moon.shadow.normalBias=.06;moon.shadow.bias=-.0002;this.scene.add(moon);
     const blood=new THREE.DirectionalLight(0xb52944,1.7);blood.position.set(4,8,-25);this.scene.add(blood);
-    const {obstacles,flames}=buildArena(this.scene);this.obstacles=obstacles;this.flames=flames;
+    this.arenas=new Map();this.selectArena('graveyard');
     this.hunter=createHunter();this.scene.add(this.hunter);
     this.playerLight=new THREE.PointLight(0xc5e9ee,7,9,2);this.scene.add(this.playerLight);
     this.entities=new THREE.Group();this.scene.add(this.entities);
@@ -35,23 +38,29 @@ export class Game {
     this.bulletGeo=new THREE.CylinderGeometry(.035,.035,.9,5);this.bulletGeo.rotateX(Math.PI/2);this.bulletMat=new THREE.MeshBasicMaterial({color:0xffe8b5});
     this.particleGeo=new THREE.IcosahedronGeometry(.075,0);this.particleMats=[new THREE.MeshBasicMaterial({color:0xe9b87b}),new THREE.MeshBasicMaterial({color:0x9e4660}),new THREE.MeshBasicMaterial({color:0x67e5d7})];
     this.ringGeo=new THREE.RingGeometry(.94,1,64);this.ringGeo.rotateX(-Math.PI/2);
-    this.loadout=normalizeLoadout();this.encounters=new Encounters(this);this.feedback=new CombatFeedback(this);this.director=new BloodmoonDirector(this);
+    this.loadout=normalizeLoadout();this.encounters=new Encounters(this);this.feedback=new CombatFeedback(this);this.director=new BloodmoonDirector(this);this.expedition=new Expedition(this);
     this.reset();this.state='menu';this.demo();this.resize();
     this.attachInput();this.last=performance.now();this.accumulator=0;this.frame=this.frame.bind(this);requestAnimationFrame(this.frame);
   }
+  selectArena(id){
+    if(!this.arenas.has(id))this.arenas.set(id,makeArena(this.scene,id));
+    for(const [key,arena]of this.arenas)arena.group.visible=key===id;
+    this.arena=this.arenas.get(id);this.obstacles=this.arena.obstacles;this.flames=this.arena.flames;
+    const color=maps.find(m=>m.id===id)?.color||0x0b131d;this.scene.background.setHex(color);this.scene.fog.color.setHex(color);
+  }
   reset() {
-    this.encounters.reset();this.feedback.reset();this.director.reset();this.runId=crypto.randomUUID();
+    this.expedition.reset();this.encounters.reset();this.feedback.reset();this.director.reset();this.runId=crypto.randomUUID();
     for(const r of this.rings)r.mesh.material.dispose();
     this.entities.clear();this.enemies=[];this.bullets=[];this.gems=[];this.particles=[];this.rings=[];
     this.stats=statsFor(this.save);configureLoadout(this.stats,this.loadout);this.weapon=weapons.find(w=>w.id===this.loadout.weapon);this.contract=contracts.find(c=>c.id===this.loadout.contract);this.hp=this.stats.maxHp;this.time=0;this.kills=0;this.level=1;this.xp=0;this.ranks={};this.pendingChoices=[];this.spawnClock=1.8;this.shotClock=0;this.dashLeft=0;this.dashTimer=0;this.novaLeft=0;this.invuln=0;this.hurtFlash=0;this.nextBoss=60;this.boss=null;this.cameraTarget=new THREE.Vector3();this.hunter.position.set(0,0,0);this.hunter.rotation.y=0;this.hunter.visible=true;this.keys.clear();this.mouseDown=false;this.auto=false;this.dashDirection=new THREE.Vector3(0,0,-1);this.touchMove.set(0,0);this.touchAim.set(0,0);this.fired=0;this.collected=0;this.upgradesChosen=0;this.dashesUsed=0;this.novasUsed=0;this.bossKills=0;this.combo=0;this.comboLeft=0;this.bestCombo=0;this.evolved=false;this.rerolls=1;this.upgradeSource='level';
   }
   demo(){for(let i=0;i<9;i++){const a=i*2.399;this.spawnEnemy(i%4===0?'brute':'ghoul',Math.cos(a)*(8+i*.8),Math.sin(a)*(8+i*.8));}for(let i=0;i<12;i++){const a=i*1.97;this.dropGem(Math.cos(a)*(3+i*.6),Math.sin(a)*(3+i*.6),2);}}
-  start(loadout=this.loadout){this.loadout=normalizeLoadout(loadout);this.reset();this.director.start();dressHunter(this.hunter,this.loadout,this.lobby?.getDye(this.loadout.hunter));this.state='playing';this.sound.unlock();for(let i=0;i<5;i++){const a=i*Math.PI*2/5;this.spawnEnemy('ghoul',Math.cos(a)*11,Math.sin(a)*11);}this.emit('state','playing');this.emit('toast',`${this.weapon.name} · ${this.contract.name}`);}
+  start(loadout=this.loadout){this.loadout=normalizeLoadout(loadout);this.selectArena(this.loadout.map);this.reset();this.director.start();this.expedition.start();dressHunter(this.hunter,this.loadout,this.lobby?.getDye(this.loadout.hunter));this.state='playing';this.sound.unlock();for(let i=0;i<5;i++){const a=i*Math.PI*2/5;this.spawnEnemy('ghoul',Math.cos(a)*11,Math.sin(a)*11);}this.emit('state','playing');this.emit('toast',`${this.weapon.name} · ${this.contract.name}`);}
   pause(){if(this.state!=='playing')return;this.state='paused';this.releaseInput();this.emit('state','paused');}
   resume(){if(this.state!=='paused')return;this.state='playing';this.releaseInput();this.emit('state','playing');}
   toMenu(){this.reset();this.state='menu';this.demo();this.emit('state','menu');}
   releaseInput(){this.keys.clear();this.mouseDown=false;this.touchMove.set(0,0);this.touchAim.set(0,0);}
-  finish(win,abandoned=false){if(this.state!=='playing')return;this.state=win?'victory':'defeat';this.hunter.visible=true;this.releaseInput();this.emit('end',{win,kills:this.kills,time:this.time,level:this.level,contract:this.loadout.contract,weapon:this.weapon.name,bestCombo:this.bestCombo,bossKills:this.bossKills,evolved:this.evolved,chests:this.encounters.chestsOpened,runId:this.runId,weaponId:this.loadout.weapon,mode:this.loadout.director,trial:this.loadout.trial,damageTaken:this.director.damageTaken,distance:this.director.distance,dashes:this.dashesUsed,director:this.director.snapshot(),abandoned});}
+  finish(win,abandoned=false){if(this.state!=='playing')return;this.state=win?'victory':'defeat';this.hunter.visible=true;this.releaseInput();this.emit('end',{win,kills:this.kills,time:this.time,level:this.level,contract:this.loadout.contract,weapon:this.weapon.name,bestCombo:this.bestCombo,bossKills:this.bossKills,evolved:this.evolved,chests:this.encounters.chestsOpened,runId:this.runId,weaponId:this.loadout.weapon,mode:this.loadout.director,trial:this.loadout.trial,map:this.loadout.map,mission:this.loadout.mission,hunter:this.loadout.hunter,objective:this.expedition.progress,damageTaken:this.director.damageTaken,distance:this.director.distance,dashes:this.dashesUsed,director:this.director.snapshot(),abandoned});}
   attachInput(){
     window.addEventListener('resize',()=>this.resize());
     window.addEventListener('keydown',e=>{
@@ -105,16 +114,16 @@ export class Game {
   damageEnemy(e,amount,show=true,crit=false){
     if(e.hp<=0)return;e.hp-=amount;e.hit=.12;if(show){this.feedback.hit(e.mesh.position,amount,crit,e.hp<=0);this.particle(e.mesh.position.x,.9,e.mesh.position.z,0,3);if(crit)this.sound.crit();}
     if(e.hp<=0){
-      this.kills++;this.combo++;this.comboLeft=4;this.bestCombo=Math.max(this.bestCombo,this.combo);const p=e.mesh.position;this.dropGem(p.x,p.z,e.xp*(this.encounters.event?.id==='swarm'?1.5:1));if(Math.random()<.07)this.dropGem(p.x+.3,p.z,20,true);
+      this.expedition.onKill(e);this.kills++;this.combo++;this.comboLeft=4;this.bestCombo=Math.max(this.bestCombo,this.combo);const p=e.mesh.position;this.dropGem(p.x,p.z,e.xp*(this.encounters.event?.id==='swarm'?1.5:1));if(Math.random()<.07)this.dropGem(p.x+.3,p.z,20,true);
       if(this.kills%18===0)this.encounters.dropPowerup(p.x,p.z,this.kills%36===0?'magnet':'fury');
       if([10,20,35,50].includes(this.combo))this.emit('toast',`${this.combo} 連殺 · 經驗加成 ${Math.round(Math.min(.5,this.combo*.01)*100)}%`);
       this.particle(p.x,.7,p.z,1,e.type==='boss'?24:9);this.entities.remove(e.mesh);
-      if(e===this.boss){this.boss=null;this.bossKills++;this.dropGem(p.x+.5,p.z,35,true);this.encounters.spawnChest(p.x,p.z);this.feedback.rune(p.x,p.z,4,0xe2bd70);this.feedback.shake=.22;this.emit('toast','典獄長已倒下 · 聖匣等待開啟');}
+      if(e.type==='boss'){if(e===this.boss)this.boss=this.enemies.find(other=>other!==e&&other.type==='boss'&&other.hp>0)||null;this.bossKills++;this.dropGem(p.x+.5,p.z,35,true);this.encounters.spawnChest(p.x,p.z);this.feedback.rune(p.x,p.z,4,0xe2bd70);this.feedback.shake=.22;this.emit('toast','典獄長已倒下 · 聖匣等待開啟');}
     }
   }
   hurt(amount){
     if(this.invuln>0||this.state!=='playing')return;
-    this.director.hurt(Math.min(this.hp,amount));this.hp=Math.max(0,this.hp-amount);this.invuln=.7;this.hurtFlash=.6;this.combo=0;this.comboLeft=0;this.feedback.shake=.16;this.sound.hurt();this.ring(this.hunter.position.x,this.hunter.position.z,0xd83455,1.4,.25);
+    amount=this.expedition.absorb(amount);if(amount<=0){this.invuln=.2;this.feedback.rune(this.hunter.position.x,this.hunter.position.z,1.2,0x91d8fa,.25);return;}this.director.hurt(Math.min(this.hp,amount));this.hp=Math.max(0,this.hp-amount);this.invuln=.7;this.hurtFlash=.6;this.combo=0;this.comboLeft=0;this.feedback.shake=.16;this.sound.hurt();this.ring(this.hunter.position.x,this.hunter.position.z,0xd83455,1.4,.25);
     if(this.hp<=0)this.finish(false);
   }
   moveAndCollide(position,dx,dz,radius){
@@ -133,19 +142,19 @@ export class Game {
   }
   nova(){
     if(this.state!=='playing'||this.novaLeft>0)return;
-    this.novaLeft=this.stats.novaCooldown;this.novasUsed++;const p=this.hunter.position;this.ring(p.x,p.z,0x67e8d9,7,.55);this.feedback.rune(p.x,p.z);this.feedback.shake=.2;this.particle(p.x,.7,p.z,2,30);this.sound.nova();
+    this.expedition.nova();this.novaLeft=this.stats.novaCooldown;this.novasUsed++;const p=this.hunter.position;this.ring(p.x,p.z,0x67e8d9,7,.55);this.feedback.rune(p.x,p.z);this.feedback.shake=.2;this.particle(p.x,.7,p.z,2,30);this.sound.nova();
     for(const e of this.enemies)if(e.hp>0&&e.mesh.position.distanceTo(p)<7+e.r){this.damageEnemy(e,this.stats.novaDamage);const dx=e.mesh.position.x-p.x,dz=e.mesh.position.z-p.z,len=Math.hypot(dx,dz)||1;this.moveAndCollide(e.mesh.position,dx/len*1.5,dz/len*1.5,e.r);}
   }
   shoot(){
     const p=this.hunter.position,base=Math.atan2(this.aimDirection.x,this.aimDirection.z),count=this.weapon.count+this.stats.projectiles-1;this.sound.shoot(this.weapon.id);this.fired++;
     for(let i=0;i<count;i++){
       const angle=base+(i-(count-1)/2)*this.weapon.spread,dx=Math.sin(angle),dz=Math.cos(angle),mesh=new THREE.Mesh(this.bulletGeo,this.bulletMat);
-      mesh.position.set(p.x+dx*.9,.85,p.z+dz*.9);mesh.rotation.y=angle;this.entities.add(mesh);
+      mesh.position.set(p.x+dx*.9,1.43,p.z+dz*.9);mesh.rotation.y=angle;this.entities.add(mesh);
       if(this.weapon.id==='crossbow')mesh.scale.set(1.8,1.8,1.5);
       const crit=Math.random()<this.stats.crit;this.bullets.push({mesh,dx,dz,life:this.weapon.life,speed:this.weapon.speed,crit,damage:this.stats.damage*this.weapon.damage*(crit?1.8:1),pierce:this.stats.pierce+this.weapon.pierce,hit:new Set()});
     }
-    this.particle(p.x+this.aimDirection.x*.9,1.35,p.z+this.aimDirection.z*.9,0,2);
-    this.feedback.spark(p.x+this.aimDirection.x,1.3,p.z+this.aimDirection.z,this.weapon.id==='shotgun'?1.8:.9,0xffd793,.08);if(this.weapon.id==='shotgun')this.feedback.shake=Math.max(this.feedback.shake,.075);
+    this.particle(p.x+this.aimDirection.x*.9,1.43,p.z+this.aimDirection.z*.9,0,2);
+    this.feedback.spark(p.x+this.aimDirection.x,1.43,p.z+this.aimDirection.z,this.weapon.id==='shotgun'?1.8:.9,0xffd793,.08);if(this.weapon.id==='shotgun')this.feedback.shake=Math.max(this.feedback.shake,.075);
   }
   gainXp(value){const earned=value*this.stats.xpBonus*(1+Math.min(.5,this.combo*.01))*(this.encounters.event?.id==='harvest'?2:1);this.xp+=earned;this.collected+=earned;this.checkLevel();}
   offerUpgrade(source='level'){this.upgradeSource=source;this.pendingChoices=choices(this.ranks);if(!this.pendingChoices.length){this.hp=Math.min(this.stats.maxHp,this.hp+30);return;}this.state='upgrade';this.releaseInput();this.sound.level();this.emit('upgrade',this.pendingChoices);}
@@ -169,17 +178,17 @@ export class Game {
   }
   update(dt){
     if(this.state!=='playing')return;
-    this.time=Math.min(RUN_SECONDS,this.time+dt);if(this.time>=RUN_SECONDS){this.finish(true);return;}
+    this.time=Math.min(RUN_SECONDS,this.time+dt);if(this.time>=RUN_SECONDS){this.finish(this.expedition.complete());return;}
     this.shotClock=Math.max(0,this.shotClock-dt);this.invuln=Math.max(0,this.invuln-dt);this.dashLeft=Math.max(0,this.dashLeft-dt);this.novaLeft=Math.max(0,this.novaLeft-dt);this.hurtFlash=Math.max(0,this.hurtFlash-dt*2);
     this.hp=Math.min(this.stats.maxHp,this.hp+this.stats.regen*dt);
-    this.director.update(dt);this.comboLeft=Math.max(0,this.comboLeft-dt);if(this.comboLeft===0)this.combo=0;this.encounters.update(dt);if(this.state!=='playing')return;
+    this.director.update(dt);this.expedition.update(dt);if(this.state!=='playing')return;this.comboLeft=Math.max(0,this.comboLeft-dt);if(this.comboLeft===0)this.combo=0;this.encounters.update(dt);if(this.state!=='playing')return;
     this.ray.setFromCamera(this.pointer,this.camera);this.ray.ray.intersectPlane(FLOOR,this.aim);
     const p=this.hunter.position;
     if(this.touchAim.lengthSq()>.03){this.aim.set(p.x+this.touchAim.x*10,0,p.z+this.touchAim.y*10);}
     const aimX=this.aim.x-p.x,aimZ=this.aim.z-p.z;
     if(Math.hypot(aimX,aimZ)>.1)this.aimDirection.set(aimX,0,aimZ).normalize();
     this.hunter.rotation.y=Math.atan2(-this.aimDirection.x,-this.aimDirection.z);
-    const m=this.movement();let dx=m.x*this.stats.speed*dt,dz=m.z*this.stats.speed*dt;
+    const m=this.movement();let dx=m.x*this.stats.speed*this.expedition.slow*dt,dz=m.z*this.stats.speed*this.expedition.slow*dt;
     if(this.dashTimer>0){this.dashTimer-=dt;dx=this.dashDirection.x*28*dt;dz=this.dashDirection.z*28*dt;this.particle(p.x,.4,p.z,2,2);}
     const beforeX=p.x,beforeZ=p.z;this.moveAndCollide(p,dx,dz,.46);this.director.distance+=Math.hypot(p.x-beforeX,p.z-beforeZ);
     const moving=Math.hypot(dx,dz)>.001;this.hunter.userData.legs.forEach((leg,i)=>leg.rotation.x=moving?Math.sin(this.time*19+i*Math.PI)*.48:0);
@@ -187,7 +196,7 @@ export class Game {
     this.hunter.visible=this.invuln<=0||Math.floor(this.time*20)%2===0;
     if((this.mouseDown||this.auto||this.touchAim.lengthSq()>.03)&&this.shotClock<=0){this.shoot();this.shotClock=this.stats.fireRate*this.weapon.interval*(this.evolved&&this.weapon.id==='pistols'?.8:1)*(this.encounters.fury>0?.5:1);}
     this.spawnClock-=dt;if(this.spawnClock<=0){this.spawnWave();this.spawnClock=Math.max(.16,(1.05-this.time*.003)/this.contract.spawn/this.director.spawn/(this.encounters.event?.id==='swarm'?1.6:1));}
-    if(this.time>=this.nextBoss){
+    if(this.loadout.mission!=='hunt'&&this.time>=this.nextBoss){
       if(!this.boss){this.spawnEnemy('boss',clamp(p.x+12,-25,25),clamp(p.z-14,-25,25));this.emit('toast','典獄長甦醒 · 留意猩紅衝擊波');}
       this.nextBoss+=60;
     }
@@ -247,5 +256,5 @@ export class Game {
     this.flames.forEach((f,i)=>f.scale.setScalar(1+Math.sin(now*.009+i)*.17));
     animateHunter(this.hunter,now*.001,this.feedback.reduced?0:1);this.renderer.render(this.scene,this.camera);this.emit('frame',this.snapshot());requestAnimationFrame(this.frame);
   }
-  snapshot(){return {state:this.state,time:this.time,hp:this.hp,maxHp:this.stats.maxHp,kills:this.kills,level:this.level,xp:this.xp,xpNeeded:xpNeeded(this.level),dash:this.dashLeft,dashMax:this.stats.dashCooldown,nova:this.novaLeft,novaMax:this.stats.novaCooldown,boss:this.boss?this.boss.hp/this.boss.maxHp:0,auto:this.auto,hurt:this.hurtFlash,enemies:this.enemies.length,bullets:this.bullets.length,gems:this.gems.length,position:{x:this.hunter.position.x,z:this.hunter.position.z},fired:this.fired,collected:this.collected,upgradesChosen:this.upgradesChosen,dashesUsed:this.dashesUsed,novasUsed:this.novasUsed,combo:this.combo,comboLeft:this.comboLeft,bestCombo:this.bestCombo,evolved:this.evolved,weapon:this.evolved?this.weapon.evolution.name:this.weapon.name,loadout:this.loadout,director:this.director.snapshot(),encounter:this.encounters.snapshot()};}
+  snapshot(){return {state:this.state,time:this.time,hp:this.hp,maxHp:this.stats.maxHp,kills:this.kills,level:this.level,xp:this.xp,xpNeeded:xpNeeded(this.level),dash:this.dashLeft,dashMax:this.stats.dashCooldown,nova:this.novaLeft,novaMax:this.stats.novaCooldown,boss:this.boss?this.boss.hp/this.boss.maxHp:0,auto:this.auto,hurt:this.hurtFlash,enemies:this.enemies.length,bullets:this.bullets.length,gems:this.gems.length,position:{x:this.hunter.position.x,z:this.hunter.position.z},fired:this.fired,collected:this.collected,upgradesChosen:this.upgradesChosen,dashesUsed:this.dashesUsed,novasUsed:this.novasUsed,combo:this.combo,comboLeft:this.comboLeft,bestCombo:this.bestCombo,evolved:this.evolved,weapon:this.evolved?this.weapon.evolution.name:this.weapon.name,loadout:this.loadout,director:this.director.snapshot(),expedition:this.expedition.snapshot(),encounter:this.encounters.snapshot()};}
 }

@@ -80,13 +80,19 @@ await test('Cloud choice keeps a recoverable backup of local progress', async ()
   await b.cloud.resolve('remote'); assert.equal(b.save.souls, 130); assert.equal(JSON.parse(b.storage.getItem(BACKUP_KEY)).save.souls, 135);
 });
 await test('Six-run memory and difficulty feedback round-trip through D1', async () => {
-  a.save.history=Array.from({length:6},()=>({id:crypto.randomUUID(),time:120,kills:150,win:false,weapon:'crossbow',trial:'pursuit',mode:'adaptive',damage:90,distance:600,dashes:20,peaks:3,breaths:2,abandoned:false,rating:'hard'}));
+  a.save.history=Array.from({length:6},()=>({id:crypto.randomUUID(),time:120,kills:150,win:false,map:'glacier',mission:'ritual',hunter:'sentinel',weapon:'crossbow',trial:'pursuit',mode:'adaptive',damage:90,distance:600,dashes:20,peaks:3,breaths:2,abandoned:false,rating:'hard'}));
   await a.cloud.sync();assert.equal(a.cloud.status,'ready');await b.cloud.sync();assert.deepEqual(b.save.history,a.save.history);
 });
 await test('An older 0.3 client can save currency without erasing new battle memory', async () => {
   const current=await (await call('GET',undefined,a.cloud.state.code)).json();
   const legacy=structuredClone(current.save);delete legacy.history;legacy.souls++;
   const response=await call('PUT',body(current.version,legacy),a.cloud.state.code);assert.equal(response.status,200);
+  const saved=await response.json();assert.deepEqual(saved.save.history,current.save.history);assert.equal(saved.save.souls,legacy.souls);
+});
+await test('An older 0.5 client preserves expedition metadata for existing run IDs', async () => {
+  const current=await (await call('GET',undefined,a.cloud.state.code)).json(),legacy=structuredClone(current.save);
+  for(const r of legacy.history){delete r.map;delete r.mission;delete r.hunter;}
+  legacy.souls++;const response=await call('PUT',body(current.version,legacy),a.cloud.state.code);assert.equal(response.status,200);
   const saved=await response.json();assert.deepEqual(saved.save.history,current.save.history);assert.equal(saved.save.souls,legacy.souls);
 });
 clearTimeout(a.cloud.timer); clearTimeout(b.cloud.timer);

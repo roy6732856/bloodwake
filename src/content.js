@@ -1,8 +1,13 @@
+import {mapId,missionId} from './world-content.js';
 export const hunters = [
   { id: 'hunter', name: '灰燼獵人', title: '穩定火力', description: '均衡的生命與火力。每次升級恢復 8 點生命。', color: '#bd626b', apply: s => s.levelHeal = 8 },
   { id: 'shade', name: '緋影遊俠', title: '高速暴擊', description: '移速 +18%、暴擊率 +15%，生命上限 -20。', color: '#b899df', apply: s => {s.speed*=1.18;s.crit+=.15;s.maxHp-=20;} },
   { id: 'oracle', name: '月蝕使徒', title: '新星法術', description: '新星冷卻 -35%、傷害 +35%，經驗 +15%。', color: '#74d4cb', apply: s => {s.novaCooldown*=.65;s.novaDamage*=1.35;s.xpBonus+=.15;} },
 ];
+hunters.push(
+  {id:'pyre',name:'熔火鍊金師',title:'燃燒控場',description:'銀彈附加每秒 8 點灼燒；新星留下四秒焰池，每秒造成 18 點傷害。生命 −10、直接射擊傷害 −15%。',color:'#efad68',apply:s=>{s.burn=8;s.maxHp-=10;s.damage*=.85;}},
+  {id:'sentinel',name:'霜衛騎士',title:'護盾反攻',description:'35 點護盾，五秒未受擊後每秒恢復 8 點；新星恢復 20 點護盾。生命 +20、移速 −10%。',color:'#8ccce8',apply:s=>{s.maxHp+=20;s.speed*=.9;}}
+);
 export const weapons = [
   { id: 'pistols', name: '銀誓雙槍', description: '穩定連射，適合走位與精準點殺。', symbol: 'Ⅱ', damage: 1, interval: 1, count: 1, spread: .12, speed: 38, life: .9, pierce: 0,
     evolution: {name:'熾天使',requires:{damage:2,rate:2},description:'祝聖銀彈 II + 午夜扳機 II → 銀彈追蹤敵人，射速再提升 20%。'} },
@@ -12,7 +17,7 @@ export const weapons = [
     evolution: {name:'雷鳴黑棘',requires:{pierce:2,crit:1},description:'穿心誓約 II + 致命獵殺 I → 命中觸發連鎖雷擊，跳躍至附近 3 個敵人。'} },
 ];
 export const contracts = [
-  {id:'standard',name:'長夜狩獵',description:'標準敵潮，存活 5 分鐘。',reward:1,spawn:1,apply:()=>{}},
+  {id:'standard',name:'長夜狩獵',description:'標準敵潮，完成所選任務。',reward:1,spawn:1,apply:()=>{}},
   {id:'swarm',name:'血潮圍城',description:'敵潮數量 +50%，殘魂收益 +35%。',reward:1.35,spawn:1.5,apply:()=>{}},
   {id:'glass',name:'孤注一擲',description:'生命 -35%、武器傷害 +45%，殘魂 +50%。',reward:1.5,spawn:1.1,apply:s=>{s.maxHp=Math.round(s.maxHp*.65);s.damage*=1.45;}},
 ];
@@ -21,7 +26,7 @@ export const events = [
   {id:'swarm',name:'血蝠遷徙',description:'血蝠持續湧入，敵人掉落額外經驗',duration:18,color:0xa17cce},
   {id:'storm',name:'猩紅星雨',description:'離開地上的紅色預警圈',duration:18,color:0xe7526c},
 ];
-export function normalizeLoadout(raw={}) {return {hunter:hunters.find(h=>h.id===raw.hunter)?.id||'hunter',weapon:weapons.find(w=>w.id===raw.weapon)?.id||'pistols',contract:contracts.find(c=>c.id===raw.contract)?.id||'standard',director:raw.director==='classic'?'classic':'adaptive',trial:['none','pursuit','eclipse'].includes(raw.trial)?raw.trial:'none'};}
+export function normalizeLoadout(raw={}) {return {hunter:hunters.find(h=>h.id===raw.hunter)?.id||'hunter',weapon:weapons.find(w=>w.id===raw.weapon)?.id||'pistols',contract:contracts.find(c=>c.id===raw.contract)?.id||'standard',director:raw.director==='classic'?'classic':'adaptive',trial:['none','pursuit','eclipse'].includes(raw.trial)?raw.trial:'none',map:mapId(raw.map),mission:missionId(raw.mission)};}
 export function configureLoadout(stats,raw){const loadout=normalizeLoadout(raw);hunters.find(h=>h.id===loadout.hunter).apply(stats);contracts.find(c=>c.id===loadout.contract).apply(stats);return loadout;}
 export function canEvolve(weaponId,ranks){const w=weapons.find(w=>w.id===weaponId);return !!w&&Object.entries(w.evolution.requires).every(([id,n])=>(ranks[id]||0)>=n);}
 export const achievements = [

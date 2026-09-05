@@ -1,3 +1,4 @@
+import {missions} from './world-content.js';
 import { sanitizeHistory, trials } from './bloodmoon.js';
 export const RUN_SECONDS = 300;
 export const blankSave = () => ({ souls: 0, best: 0, runs: 0, wins: 0, achievements: [], history: [], ranks: { power: 0, vitality: 0, reach: 0 } });
@@ -29,7 +30,7 @@ export function statsFor(save) {
 export function rewardFor(kills, time, win) { return Math.floor(kills / 8) + Math.floor(time / 20) + (win ? 20 : 0); }
 export function settleRun(save, result) {
   const multiplier={standard:1,swarm:1.35,glass:1.5}[result.contract]||1;
-  const reward = Math.floor(rewardFor(result.kills, result.time, result.win)*multiplier*(trials.find(t=>t.id===result.trial)?.reward||1));
+  const reward = Math.floor(rewardFor(result.kills, result.time, result.win)*multiplier*(trials.find(t=>t.id===result.trial)?.reward||1)*(missions.find(m=>m.id===result.mission)?.reward||1));
   save.souls += reward; save.runs++; if (result.win) save.wins++;
   save.best = Math.max(save.best, Math.floor(Math.min(300, result.time))); return reward;
 }

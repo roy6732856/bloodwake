@@ -1,3 +1,4 @@
+import {mapId,missionId} from './world-content.js';
 // Local, explainable recommendations. No language-model calls or paid inference.
 export const trials = [
   {id:'none',name:'自由狩獵',description:'維持所選契約，專注完成自己的流派。',reward:1},
@@ -10,6 +11,7 @@ export function sanitizeHistory(raw){
   const seen=new Set();
   return raw.slice(-6).filter(r=>r&&typeof r.id==='string'&&/^[a-f0-9-]{36}$/.test(r.id)&&!seen.has(r.id)&&seen.add(r.id)).map(r=>({
     id:r.id,time:int(r.time,300),kills:int(r.kills,100000),win:r.win===true,
+    map:mapId(r.map),mission:missionId(r.mission),hunter:['hunter','shade','oracle','pyre','sentinel'].includes(r.hunter)?r.hunter:'hunter',
     weapon:['pistols','shotgun','crossbow'].includes(r.weapon)?r.weapon:'pistols',
     trial:trials.some(t=>t.id===r.trial)?r.trial:'none',mode:r.mode==='classic'?'classic':'adaptive',
     damage:int(r.damage,100000),distance:int(r.distance,10000),dashes:int(r.dashes,1000),
@@ -21,7 +23,7 @@ export function recordRun(save,result){
   save.history=sanitizeHistory(save.history);
   if(save.history.some(r=>r.id===result.runId))return;
   save.history=sanitizeHistory([...save.history,{id:result.runId,time:result.time,kills:result.kills,win:result.win,
-    weapon:result.weaponId,trial:result.trial,mode:result.mode,damage:result.damageTaken,distance:result.distance,
+    weapon:result.weaponId,map:result.map,mission:result.mission,hunter:result.hunter,trial:result.trial,mode:result.mode,damage:result.damageTaken,distance:result.distance,
     dashes:result.dashes,peaks:result.director?.peaks,breaths:result.director?.breaths,abandoned:result.abandoned,rating:null}]);
 }
 export function rateRun(save,id,rating){

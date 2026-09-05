@@ -24,6 +24,39 @@ button.onclick=async()=>{
     doc.querySelector('#start').click();doc.querySelector('[data-select-hunter="hunter"]').click();doc.querySelector('[data-select-weapon="crossbow"]').click();doc.querySelector('#loadout-back').click();
     assert(g.lobby.role==='hunter'&&g.lobby.model.userData.crossbowParts.every(p=>p.visible),'advanced loadout and lobby diverged');
   });
+  test('All five 3D characters select with matching actual abilities and reset cleanly',()=>{
+    for(const role of ['hunter','shade','oracle','pyre','sentinel']){g.toMenu();doc.querySelector('[data-lobby-hunter="'+role+'"]').click();doc.querySelector('#quick-start').click();assert(g.loadout.hunter===role,'wrong role');assert(g.hunter.userData.variants[role].visible,'missing role model');assert(Object.values(g.hunter.userData.variants).filter(v=>v.visible).length===1,'overlapping variants');}
+    assert(g.expedition.shield===35&&g.stats.maxHp===120,'sentinel ability missing');g.start({hunter:'hunter'});assert(g.expedition.shield===0,'shield leaked to hunter');
+  });
+  test('Expedition choices deploy the selected arena and objective through the real menu',()=>{
+    g.toMenu();doc.querySelector('#open-expedition').click();doc.querySelector('[data-select-map="foundry"]').click();doc.querySelector('[data-select-mission="ritual"]').click();doc.querySelector('#deploy').click();
+    assert(g.loadout.map==='foundry'&&g.expedition.id==='ritual','selection not deployed');assert(g.arena.hazards.length===8&&g.expedition.sites.length===3,'map or objectives absent');
+    g.emit('frame',g.snapshot());assert(doc.querySelector('#expedition-hud').textContent.includes('封印儀式'),'objective HUD missing');
+    g.start({map:'glacier'});assert(g.arena.hazards.length===4,'glacier terrain missing');assert([...g.arenas.values()].filter(a=>a.group.visible).length===1,'multiple maps visible');
+  });
+  test('Frost shield absorbs overflow correctly, waits five seconds and pauses its recovery',()=>{
+    g.start({hunter:'sentinel',director:'classic'});clearEnemies();const hp=g.hp;g.hurt(45);assert(g.hp===hp-10&&g.expedition.shield===0,'damage overflow wrong');step(4);assert(g.expedition.shield===0,'regenerated too early');g.pause();step(8);assert(g.expedition.shield===0,'pause regenerated');g.resume();step(2);assert(g.expedition.shield>7&&g.expedition.shield<9,'recovery rate wrong');g.nova();assert(g.expedition.shield>27&&g.expedition.shield<29,'nova did not restore 20 shield');
+  });
+  test('Alchemist nova leaves a damaging timed area that cannot survive a restart',()=>{
+    g.start({hunter:'pyre',director:'classic'});clearEnemies();g.nova();assert(g.expedition.pyres.length===1,'no fire pool');const e=g.spawnEnemy('brute',3,0);e.speed=0;const hp=e.hp;step(.6);assert(e.hp<hp,'pool did not damage later arrivals');step(3.5);assert(g.expedition.pyres.length===0,'expired pool leaked');g.novaLeft=0;g.nova();g.start({hunter:'hunter'});assert(g.expedition.pyres.length===0,'pool survived restart');
+  });
+  test('Foundry telegraph gives safe bridge crossings; glacier slows only while in active frost',()=>{
+    g.start({map:'foundry',director:'classic'});clearEnemies();g.hunter.position.set(8,0,8);g.time=12;const hp=g.hp;step(1);assert(g.hp===hp,'warning damaged player');g.time=14;step(.1);assert(g.hp<hp,'active lava harmless');g.hunter.position.set(8,0,0);g.invuln=0;const bridgeHp=g.hp;step(.5);assert(g.hp===bridgeHp,'bridge damaged player');
+    g.start({map:'glacier',director:'classic'});clearEnemies();g.time=14;g.hunter.position.set(-11,0,-10);step(.02);assert(g.expedition.slow===.65,'frost did not slow');g.hunter.position.set(0,0,0);step(.02);assert(g.expedition.slow===1,'slow persisted outside frost');
+  });
+  test('Ritual requires uncontested presence at all three distinct reachable shrines',()=>{
+    g.start({mission:'ritual',map:'glacier',director:'classic'});clearEnemies();g.expedition.nextPressure=999;
+    const sites=g.expedition.sites;assert(new Set(sites.map(p=>p.join(','))).size===3,'duplicate sites');assert(sites.every(([x,z])=>g.obstacles.every(o=>Math.hypot(x-o.x,z-o.z)>o.r+3)),'altar blocked');
+    const [x,z]=sites[0];g.hunter.position.set(x,0,z);const e=g.spawnEnemy('brute',x+3.5,z);e.speed=0;step(1);assert(g.expedition.charge===0&&g.expedition.blocked,'contested altar charged');clearEnemies();step(2);const charge=g.expedition.charge;g.pause();step(4);assert(g.expedition.charge===charge,'pause charged altar');g.resume();g.hunter.position.set(0,0,0);step(1);assert(g.expedition.charge<charge,'leaving did not decay progress');
+    for(let i=0;i<3;i++){clearEnemies();const [a,b]=sites[i];g.hunter.position.set(a,0,b);for(let k=0;k<600&&g.expedition.progress<=i;k++){if(g.state==='upgrade')g.chooseUpgrade(0);g.update(1/60);}assert(g.expedition.progress===i+1,'altar '+i+' never captured');}
+    while(g.state==='upgrade')g.chooseUpgrade(0);g.time=299.99;step(.1);assert(g.state==='victory','completed ritual lost');
+  });
+  test('Hunt bosses arrive despite a full weak-enemy crowd; avoiding them cannot win',()=>{
+    g.start({mission:'hunt',director:'classic'});clearEnemies();for(let i=0;i<90;i++)g.spawnEnemy('ghoul',26,26);g.time=40;step(.1);assert(g.expedition.pending,'boss warning missing');g.pause();const left=g.expedition.pending.left;step(4);assert(g.expedition.pending.left===left,'pause consumed boss warning');g.resume();step(3);assert(g.enemies.some(e=>e.huntTarget),'full crowd prevented boss');assert(g.enemies.length<=90,'boss broke cap');g.time=299.99;step(.1);assert(g.state==='defeat','no-objective pacifist victory');
+    g.start({mission:'hunt',director:'classic'});clearEnemies();g.expedition.nextPressure=999;
+    for(const time of [40,120,200]){g.time=time;step(3.2);const e=g.enemies.find(e=>e.huntTarget&&e.hp>0);assert(e,'missing target at '+time);g.damageEnemy(e,1e6);while(g.state==='upgrade')g.chooseUpgrade(0);clearEnemies();}
+    assert(g.expedition.progress===3,'target kills not counted');g.time=299.99;step(.1);assert(g.state==='victory','completed hunt lost');
+  });
   test('WASD movement and arena bounds',()=>{clearEnemies();g.keys.add('KeyD');step(1);g.keys.clear();assert(g.hunter.position.x>6&&g.hunter.position.x<7,'D should move ~6.4m');g.hunter.position.set(27.4,0,12);g.keys.add('KeyD');step(1);assert(g.hunter.position.x<=27.5,'escaped arena');});
   test('Gravestone collision stops traversal',()=>{clearEnemies();const o=g.obstacles.find(o=>o.x===-10);g.hunter.position.set(o.x-3,0,o.z);g.keys.add('KeyD');step(.6);assert(g.hunter.position.x<=o.x-o.r-.44,'walked through gravestone');});
   test('Aimed silver bullets kill a real enemy',()=>{clearEnemies();g.camera.position.set(0,26,19);g.camera.lookAt(0,0,0);g.camera.updateMatrixWorld();g.pointer.set(0,.4);const e=g.spawnEnemy('ghoul',0,-5);e.speed=0;g.mouseDown=true;step(1);assert(g.fired>=4,'shoot input failed');assert(g.kills===1,'projectiles did not kill');assert(g.gems.length>0,'kill did not drop XP');});
@@ -72,8 +105,8 @@ button.onclick=async()=>{
     g.toMenu();const music=g.lobby.music;
     if(!music.playing)await music.toggle();await new Promise(r=>setTimeout(r,300));
     assert(music.playing&&g.sound.ctx.state==='running'&&music.nodes.size>0,'music produced no active audio');
-    for(let i=0;i<12;i++)g.lobby.select(['hunter','shade','oracle'][i%3],false);
-    await new Promise(r=>setTimeout(r,400));assert(music.role==='oracle'&&music.nodes.size<30,'theme switch leaked voices');
+    for(let i=0;i<15;i++)g.lobby.select(['hunter','shade','oracle','pyre','sentinel'][i%5],false);
+    await new Promise(r=>setTimeout(r,400));assert(music.role==='sentinel'&&music.nodes.size<30,'theme switch leaked voices');
     await music.toggle();await new Promise(r=>setTimeout(r,300));assert(!music.playing&&music.nodes.size===0&&!music.timer,'pause left audio running');
     lines.push('PASS Music produces audio, switches themes without voice leaks and fully stops');
   }catch(error){lines.push('FAIL Music lifecycle: '+error.message);if(g.lobby.music.playing)await g.lobby.music.toggle();}

@@ -106,5 +106,5 @@ export function buildArena(scene) {
   const runeTexture=new THREE.TextureLoader().load('/assets/arcane-ring.png');
   const ritual=new THREE.Mesh(new THREE.PlaneGeometry(8.6,8.6),new THREE.MeshBasicMaterial({map:runeTexture,color:0x91c8ba,transparent:true,opacity:.16,depthWrite:false,blending:THREE.AdditiveBlending}));ritual.rotation.x=-Math.PI/2;ritual.position.y=.022;group.add(ritual);
   for(let i=0;i<65;i++) { const a=rand()*Math.PI*2,r=24+rand()*7; const m=box(group,Math.cos(a)*r,.12,Math.sin(a)*r,.2+rand()*.5,.2+rand()*.5,.3+rand()*.5,stone);m.rotation.set(rand(),rand(),rand()); }
-  return { obstacles, flames };
+  return { group, obstacles, flames };
 }

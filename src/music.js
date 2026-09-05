@@ -1,5 +1,7 @@
 // Original, locally synthesized scores. No streaming, tracking or remote inference.
 export const themes = {
+  pyre:{name:'熔爐脈動',subtitle:'重拍 · 銅鐘 · 熔火',bpm:96,root:36,scale:[0,3,7,6,10,7,3,0],chords:[0,-2,-5,3]},
+  sentinel:{name:'冰封誓約',subtitle:'低音 · 晶鐘 · 霜風',bpm:60,root:40,scale:[0,7,12,10,7,3,2,7],chords:[0,3,-5,-2]},
   hunter: { name: '灰燼聖歌', subtitle: '低音鼓 · 銅鐘 · 暗潮', bpm: 76, root: 38, scale: [0, 3, 7, 10, 12, 7, 3, 2], chords: [0, -2, 3, -5] },
   shade: { name: '紫夜疾行', subtitle: '碎拍 · 撥弦 · 迷霧', bpm: 108, root: 45, scale: [0, 7, 10, 12, 3, 7, 14, 10], chords: [0, 3, -2, -5] },
   oracle: { name: '月蝕祈禱', subtitle: '空靈合音 · 水晶鐘', bpm: 64, root: 43, scale: [0, 7, 12, 14, 15, 14, 7, 3], chords: [0, -5, 3, -2] },

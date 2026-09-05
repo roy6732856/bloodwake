@@ -7,6 +7,8 @@ const $=id=>document.getElementById(id);
 export const personas={
   hunter:{ en:'THE ASHEN HUNTER', line:'餘燼尚存，銀誓不滅。', ability:'灰燼契約', detail:'每次升級恢復 8 點生命', effect:'銀誓齊射', values:[70,65,55], colors:[['血誓',0xba2546],['古金',0xac7438],['霜銀',0x7896ad]] },
   shade:{ en:'THE VEILED WANDERER', line:'讓黑夜，追不上你的影子。', ability:'緋影步法', detail:'移速 +18% · 暴擊率 +15% · 生命 −20', effect:'緋影殘像', values:[85,95,35], colors:[['紫夜',0x7950bd],['緋紅',0xc5346f],['月白',0x839dab]] },
+  pyre:{en:'THE EMBER ALCHEMIST',line:'將餘燼，煉成下一場風暴。',ability:'熔火鍊成',detail:'銀彈灼燒 · 新星留下焰池 · 生命 −10',effect:'熔火焰池',values:[90,55,80],colors:[['熔金',0xc66b28],['銅綠',0x518e75],['暗紅',0x993646]]},
+  sentinel:{en:'THE FROST SENTINEL',line:'寒霜不退，誓約不滅。',ability:'霜衛護盾',detail:'35 點再生護盾 · 新星回盾 · 移速 −10%',effect:'霜衛屏障',values:[60,40,90],colors:[['霜藍',0x5b9abd],['銀白',0x9aa7b6],['暮紫',0x80658b]]},
   oracle:{ en:'THE ECLIPSE ORACLE', line:'聽見月蝕，回應群星。', ability:'月蝕共鳴', detail:'新星冷卻 −35% · 傷害 +35% · 經驗 +15%', effect:'月蝕新星', values:[60,55,95], colors:[['碧月',0x258f92],['紫晶',0x7e62b5],['琥珀',0xc18b38]] },
 };
 const icon=(name)=>`<svg viewBox="0 0 40 40" aria-hidden="true"><path d="${name==='nova'?'M20 3 24 15 37 20 24 25 20 37 16 25 3 20 16 15ZM20 10V3M30 20H37M20 30V37M10 20H3':name==='dash'?'M6 25 18 13 24 19 35 8M6 32 18 20 24 26 35 15':'M9 31 14 21 29 6 35 12 20 27 9 31ZM14 21 20 27M25 10 31 16'}"/></svg>`;
@@ -55,7 +57,7 @@ export class Lobby {
     this.bind();this.select(this.role,false);
   }
   bind() {
-    $('hunter-roster').innerHTML=hunters.map((h,i)=>`<button class="hunter-slot" data-lobby-hunter="${h.id}" aria-pressed="false"><img src="/assets/${h.id}-v05.png" alt="${h.name}的概念肖像"><span><small>0${i+1} / ${h.title}</small><strong>${h.name}</strong></span><i></i></button>`).join('');
+    $('hunter-roster').innerHTML=hunters.map((h,i)=>`<button class="hunter-slot" data-lobby-hunter="${h.id}" aria-pressed="false"><img src="/assets/${h.id}-${['pyre','sentinel'].includes(h.id)?'v06':'v05'}.png" alt="${h.name}的概念肖像"><span><small>0${i+1} / ${h.title}</small><strong>${h.name}</strong></span><i></i></button>`).join('');
     document.querySelectorAll('[data-lobby-hunter]').forEach(b=>b.onclick=()=>this.select(b.dataset.lobbyHunter));
     $('preview-effect').onclick=()=>this.preview();
     $('preview-nova').onclick=()=>this.preview('nova');
@@ -111,7 +113,7 @@ export class Lobby {
     this.model.position.x=this.effectTime&&this.effectKind==='shade'?Math.sin(progress*Math.PI*2)*.55*motion:0;
     animateHunter(this.model,t,motion);this.dust.rotation.y=t*.018*motion;this.halo.rotation.z=Math.sin(t*.15)*.07*motion;
     this.accent.intensity=4+(this.effectTime?Math.sin(progress*Math.PI)*6:0);
-    this.wave.visible=this.effectTime>0&&(this.effectKind==='nova'||this.effectKind==='oracle');this.wave.position.y=.24;
+    this.wave.visible=this.effectTime>0&&(this.effectKind==='nova'||this.effectKind==='oracle'||this.effectKind==='pyre'||this.effectKind==='sentinel');this.wave.position.y=.24;
     this.wave.scale.setScalar(.15+progress*1.55);this.fxMat.opacity=Math.max(0,Math.sin(progress*Math.PI))*.9;
     this.fxParticles.forEach((p,i)=>{
       p.visible=this.effectTime>0;const a=i*2.399,rad=.4+progress*1.7;
