@@ -1,5 +1,7 @@
 # BLOODWAKE｜血月獵場
 
+**[直接線上玩](https://bloodwake.vitas880709.workers.dev)** · [Public GitHub](https://github.com/roy6732856/bloodwake)
+
 可直接玩的 3D 俯視生存射擊 Roguelite 原型。Three.js 真實 3D 場景，繁體中文介面，單局 5 分鐘，離線本機可運行。
 
 ## 0.2 Arsenal Update

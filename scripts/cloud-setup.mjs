@@ -25,6 +25,7 @@ try {
     if (old.d1_databases?.[0]?.database_id !== database.uuid) throw new Error('Deployment config targets a different D1 database. Check the selected account before proceeding.');
   }
   config.d1_databases[0].database_id = database.uuid;
+  if (process.env.CLOUDFLARE_ACCOUNT_ID) config.account_id = process.env.CLOUDFLARE_ACCOUNT_ID;
   writeFileSync('wrangler.deploy.json', JSON.stringify(config, null, 2) + '\n');
   run(['d1', 'migrations', 'apply', 'DB', '--remote', '--config', 'wrangler.deploy.json']);
   console.log('D1 is ready. Run npm run deploy to publish the game.');
